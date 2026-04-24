@@ -58,18 +58,17 @@ TASK_CHANGE_REF=$(awk '
   found && NF && !/^<!--/ && !/^---/ { print; exit }
 ' "$TASK_FILE" | tr -d '[:space:]')
 
-if [ -n "$TASK_CHANGE_REF" ]; then
-  if [ "$TASK_CHANGE_REF" != "$CHANGE_NAME" ]; then
-    echo "$LABEL FAIL: Change reference mismatch in $TASK_FILE:" >&2
-    echo "$LABEL       Expected: $CHANGE_NAME" >&2
-    echo "$LABEL       Found:    $TASK_CHANGE_REF" >&2
-    CONSISTENCY_FAILED=1
-  else
-    echo "$LABEL   current-task  Change reference: '$TASK_CHANGE_REF' — matches."
-  fi
+if [ -z "$TASK_CHANGE_REF" ]; then
+  echo "$LABEL FAIL: Change reference not set in $TASK_FILE." >&2
+  echo "$LABEL       Set it to '$CHANGE_NAME' (canonical source for hooks and scripts)." >&2
+  CONSISTENCY_FAILED=1
+elif [ "$TASK_CHANGE_REF" != "$CHANGE_NAME" ]; then
+  echo "$LABEL FAIL: Change reference mismatch in $TASK_FILE:" >&2
+  echo "$LABEL       Expected: $CHANGE_NAME" >&2
+  echo "$LABEL       Found:    $TASK_CHANGE_REF" >&2
+  CONSISTENCY_FAILED=1
 else
-  echo "$LABEL WARN: Change reference not set in $TASK_FILE."
-  echo "$LABEL       Set it to '$CHANGE_NAME' to enable this consistency check."
+  echo "$LABEL   current-task  Change reference: '$TASK_CHANGE_REF' — matches."
 fi
 
 # 3. Change reference in execution-record.md must match $1 (only if file exists)
