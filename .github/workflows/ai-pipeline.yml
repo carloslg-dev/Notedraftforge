@@ -1,0 +1,25 @@
+name: AI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - docs/create-agent-pipeline
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  pipeline-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required pipeline documents
+        run: bash scripts/ai/pre-plan.sh
+
+      - name: Validate code
+        run: bash scripts/ai/validate.sh
