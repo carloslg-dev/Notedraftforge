@@ -43,7 +43,7 @@ fi
 
 # --- Tests ---
 echo "$LABEL Running tests..."
-if ! $NG test --watch=false --browsers=ChromeHeadless; then
+if ! $NG test --watch=false; then
   echo "$LABEL ERROR: Tests failed." >&2
   FAILED=1
 fi
