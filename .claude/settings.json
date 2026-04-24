@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/ai/post-edit.sh"
+            "command": ".claude/hooks/post-edit-hook.sh"
           }
         ]
       }
