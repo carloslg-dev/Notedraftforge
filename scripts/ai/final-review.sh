@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # final-review.sh — Run at the end of RETRO phase, before committing.
 # Quality gate for task closure:
+#   0. Validates <change-name> consistency across all sources.
 #   1. Checks .ai/current-task.md: authorization, validation result, blockers, retro.
 #   2. Checks openspec/changes/<change-name>/execution-record.md: existence and content.
 #
 # Usage:
 #   ./scripts/ai/final-review.sh <change-name>
 #
-# <change-name> must match a directory under openspec/changes/.
+# <change-name> must match:
+#   - a directory under openspec/changes/
+#   - the "Change reference" field in .ai/current-task.md
+#   - the "Change reference" field in the execution-record.md
 set -euo pipefail
 
 LABEL="[final-review]"
@@ -22,15 +26,83 @@ if [ -z "${1:-}" ]; then
   exit 1
 fi
 CHANGE_NAME="$1"
+RECORD_PATH="openspec/changes/${CHANGE_NAME}/execution-record.md"
+
+# --- current-task.md must exist (local mode requirement) ---
+if [ ! -f "$TASK_FILE" ]; then
+  echo "$LABEL ERROR: $TASK_FILE not found." >&2
+  echo "$LABEL       final-review.sh requires local task state. Create it first:" >&2
+  echo "$LABEL         cp docs/ai/current-task.template.md $TASK_FILE" >&2
+  exit 1
+fi
+
+# ============================================================
+# Consistency: validate <change-name> across all sources
+# ============================================================
+
+echo "$LABEL Validating change-name: '$CHANGE_NAME'..."
+CONSISTENCY_FAILED=0
+
+# 1. openspec/changes/<change-name>/ folder must exist
+if [ ! -d "openspec/changes/${CHANGE_NAME}" ]; then
+  echo "$LABEL FAIL: Directory not found: openspec/changes/${CHANGE_NAME}/" >&2
+  echo "$LABEL       Create the change directory before running final-review." >&2
+  exit 1
+fi
+echo "$LABEL   Folder: openspec/changes/${CHANGE_NAME}/ — found."
+
+# 2. Change reference in current-task.md must match $1
+TASK_CHANGE_REF=$(awk '
+  /^## Change reference/ { found=1; next }
+  found && /^## /        { exit }
+  found && NF && !/^<!--/ && !/^---/ { print; exit }
+' "$TASK_FILE" | tr -d '[:space:]')
+
+if [ -n "$TASK_CHANGE_REF" ]; then
+  if [ "$TASK_CHANGE_REF" != "$CHANGE_NAME" ]; then
+    echo "$LABEL FAIL: Change reference mismatch in $TASK_FILE:" >&2
+    echo "$LABEL       Expected: $CHANGE_NAME" >&2
+    echo "$LABEL       Found:    $TASK_CHANGE_REF" >&2
+    CONSISTENCY_FAILED=1
+  else
+    echo "$LABEL   current-task  Change reference: '$TASK_CHANGE_REF' — matches."
+  fi
+else
+  echo "$LABEL WARN: Change reference not set in $TASK_FILE."
+  echo "$LABEL       Set it to '$CHANGE_NAME' to enable this consistency check."
+fi
+
+# 3. Change reference in execution-record.md must match $1 (only if file exists)
+if [ -f "$RECORD_PATH" ]; then
+  RECORD_CHANGE_REF=$(awk '
+    /^## Change reference/ { found=1; next }
+    found && /^## /        { exit }
+    found && NF && !/^<!--/ && !/^---/ { print; exit }
+  ' "$RECORD_PATH" | tr -d '[:space:]')
+
+  if [ -n "$RECORD_CHANGE_REF" ]; then
+    if [ "$RECORD_CHANGE_REF" != "$CHANGE_NAME" ]; then
+      echo "$LABEL FAIL: Change reference mismatch in $RECORD_PATH:" >&2
+      echo "$LABEL       Expected: $CHANGE_NAME" >&2
+      echo "$LABEL       Found:    $RECORD_CHANGE_REF" >&2
+      CONSISTENCY_FAILED=1
+    else
+      echo "$LABEL   execution-record Change reference: '$RECORD_CHANGE_REF' — matches."
+    fi
+  else
+    echo "$LABEL WARN: Change reference not set in $RECORD_PATH."
+    echo "$LABEL       Set it to '$CHANGE_NAME' (will also be caught by content checks below)."
+  fi
+fi
+
+if [ "$CONSISTENCY_FAILED" -eq 1 ]; then
+  echo "$LABEL BLOCKED: Fix change-name consistency before continuing." >&2
+  exit 1
+fi
 
 # ============================================================
 # Part 1: .ai/current-task.md checks
 # ============================================================
-
-if [ ! -f "$TASK_FILE" ]; then
-  echo "$LABEL ERROR: $TASK_FILE not found." >&2
-  exit 1
-fi
 
 echo "$LABEL Checking $TASK_FILE..."
 
@@ -111,8 +183,6 @@ fi
 # Part 2: execution-record.md checks
 # ============================================================
 
-RECORD_PATH="openspec/changes/${CHANGE_NAME}/execution-record.md"
-
 echo "$LABEL Checking $RECORD_PATH..."
 
 if [ ! -f "$RECORD_PATH" ]; then
@@ -134,11 +204,11 @@ else
     echo "$LABEL   Task reference: OK ($TASK_REF)"
   fi
 
-  # 2. Change reference must not be empty
+  # 2. Change reference must not be empty (value match already checked in consistency section)
   CHANGE_REF=$(awk '
     /^## Change reference/ { found=1; next }
     found && /^## /        { exit }
-    found && NF && !/^<!--/ { print; exit }
+    found && NF && !/^<!--/ && !/^---/ { print; exit }
   ' "$RECORD_PATH" | tr -d '[:space:]')
 
   if [ -z "$CHANGE_REF" ]; then
