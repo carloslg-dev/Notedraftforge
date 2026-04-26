@@ -85,6 +85,111 @@ It exists to keep architectural and product decisions traceable across chats and
 
 ---
 
+### D-10 — Structured content model
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** `Piece.content` must no longer be modeled as a raw Markdown string. The domain model will use a discriminated structured content model: `TextPieceContent`, `PoemPieceContent`, and `SongPieceContent`.
+- **Motivation:** Avoid Markdown lock-in, prepare song structure without future core refactor, and keep the domain independent from editor/import/export formats.
+- **Impacts:** Domain Model, Piece Management, Annotation System, Snapshot & Layer State, Architecture
+- **Transfer status:** Pending
+
+### D-11 — Dual annotation target system
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Annotations must target structured domain locations instead of embedded Markdown anchor tags. Supported target families are text ranges, nodes, song cells, and future song-cell ranges.
+- **Motivation:** Align with modern editor models, support robust text annotations, and allow future structural annotations for songs/workspaces.
+- **Impacts:** Domain Model, Annotation System, Renderer, Editor Adapter
+- **Transfer status:** Pending
+
+### D-12 — Anchor tags are not source of truth
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Embedded anchor tags are no longer the canonical model for annotations. They may exist only as an implementation/export/rendering mechanism if needed.
+- **Motivation:** Prevent Markdown pollution, avoid fragile text markers, and support non-linear structures like song cells.
+- **Impacts:** Domain Model, Annotation System, Import/Export, Renderer
+- **Transfer status:** Pending
+
+### D-13 — Structured song model
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Songs must be prepared as structured content with sections and cells. `SongCell` is the atomic musical/textual unit and may own `chord` and `meter` values directly.
+- **MVP scope:** Song UI is not part of the first functional MVP. Pitch dots, pitch lines, duration editing, advanced notation, and multi-cell annotation behavior are future features.
+- **Impacts:** Domain Model, Renderer, Future Song UI, Annotation System
+- **Transfer status:** Pending
+
+### D-14 — Markdown is import/export format
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Markdown is supported as an import/export format, not as the internal source of truth. Internal text/poem content uses structured blocks and inline text runs.
+- **Motivation:** Preserve flexibility for editor replacement, structured annotations, future workspace/narrative flows, and richer rendering.
+- **Impacts:** Domain Model, Import/Export, Piece Management, Editor Adapter
+- **Transfer status:** Pending
+
+### D-15 — Tiptap OSS editor adapter
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Use Tiptap OSS as the initial editor engine, encapsulated behind an editor adapter/port. The domain must not store Tiptap JSON.
+- **Rules:** Tiptap lives in infrastructure/UI only. Tiptap Pro/Platform features are not part of the core MVP.
+- **Motivation:** Accelerate MVP using a mature ProseMirror-based editor while keeping the editor replaceable.
+- **Impacts:** Architecture, Editor Modes, Domain Model, Annotation System
+- **Transfer status:** Pending
+
+### D-16 — React frontend strategy
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Switch the frontend strategy from Angular to React before implementation starts.
+- **Motivation:** Better alignment with Tiptap ecosystem, broader market adoption, easier future hiring/collaboration, better fit for product/portfolio, and a flexible mobile path through Capacitor first and React Native later if needed.
+- **Rules:** React is UI infrastructure only. Domain, application, ports, and adapters remain framework-independent.
+- **Impacts:** Architecture, Backlog, Project Setup, UI Features
+- **Transfer status:** Pending
+
+### D-17 — Structured tag model
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Tags should be structured as `TagRef` with a category/kind, such as `type` or `user`, instead of mixing type semantics inside plain strings.
+- **Motivation:** Keep filtering flexible and avoid ambiguous type-as-string behavior.
+- **Impacts:** Domain Model, Piece Management, Work List
+- **Transfer status:** Pending
+
+### D-18 — UI strategy: Tailwind CSS + shadcn/ui
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Use Tailwind CSS and shadcn/ui for React UI implementation.
+- **Rules:** UI components are copied into the project and remain owned/customizable by the app. UI layer must not contain domain logic.
+- **Motivation:** Accelerate development with modern, customizable UI primitives without runtime component-library lock-in.
+- **Impacts:** Architecture, Project Setup, UI Features
+- **Transfer status:** Pending
+
+### D-19 — Zustand for UI state only
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Use Zustand only for UI state such as modal state, panels, transient selections, and local view state.
+- **Rules:** Zustand must not contain domain logic, persistence rules, business invariants, or application use cases.
+- **Motivation:** Keep React UI state simple without introducing Redux-level ceremony.
+- **Impacts:** Architecture, UI Features
+- **Transfer status:** Pending
+
+### D-20 — Zod for boundary validation
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Use Zod only at system boundaries to validate raw external data before mapping it into domain objects.
+- **Flow:** External data → Zod validation → Mapper → Domain.
+- **Rules:** Zod must not live in the domain and must not replace business/domain invariants.
+- **Motivation:** Protect the domain from corrupted IndexedDB data, future API responses, imports, migrations, and backups.
+- **Impacts:** Architecture, Persistence Adapters, Import/Export, Migrations
+- **Transfer status:** Pending
+
+### D-21 — Dexie for IndexedDB adapter
+- **Date:** 2026-04-26
+- **Status:** Decided
+- **Summary:** Use Dexie as the initial IndexedDB adapter implementation.
+- **Rules:** Dexie is infrastructure only. Repositories expose ports to the application layer. Domain must not depend on Dexie or IndexedDB.
+- **Motivation:** Reduce IndexedDB complexity while preserving persistence replaceability.
+- **Impacts:** Architecture, Persistence, Backlog
+- **Transfer status:** Pending
+
+---
+
 ## Documentation Transfer Checklist
 
 These are the follow-up updates to fully transfer decisions into specs/docs.

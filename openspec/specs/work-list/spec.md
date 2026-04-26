@@ -1,100 +1,124 @@
 # Spec: Work List
 
-> References: `openspec/domain-model.md`, `openspec/terminology.md`
+> References: `openspec/domain-model.md`, `openspec/specs/piece-management/spec.md`, `openspec/terminology.md`
 
 ## Purpose
-Display all Pieces as a list of Works, allow filtering by tags, and navigate to a selected Work.
+Define list-level behavior for browsing Works (Pieces), filtering by structured tags, and navigating to a selected piece.
 
 ---
 
-## Screen: Works List
+## Requirements
 
-### Entry
-- Default screen on app launch
-- Destination after closing/leaving a piece
+### WL-REQ-01 — List load and default order
+When the Work List is opened, the system SHALL load all pieces via `PieceRepository.getAll()`.
 
-### Behavior
-- Load all pieces via `PieceRepository.getAll()` on entry
-- Display each piece as a list item showing: `title`, `type` badge, and any user-defined tags
-- If the list is empty, show an empty state (see below)
+Default sorting SHALL be `updatedAt` descending (most recently updated first).
 
----
+### WL-REQ-02 — List item display
+Each list item SHALL display:
+- piece `title`
+- type badge (resolved from `TagRef(kind="type")` or `Piece.type`)
+- up to 2–3 user tags (`TagRef(kind="user")`) near/below title
+- `updatedAt` information for recency context
 
-## Use Cases
+Work List SHALL NOT display editor-internal payloads or Markdown source content.
 
-### UC-WL-01: Display Works List
-**Trigger:** Screen is entered  
-**Behavior:**
-- Fetch all pieces
-- Sort by `updatedAt` descending (most recently updated first)
-- Render list
+### WL-REQ-03 — Type display semantics
+Type semantics SHALL be consistent with structured tags:
+- canonical type representation in tags is `TagRef(kind="type", value=<type>)`
+- `Piece.type` remains valid typed metadata
 
----
+If both are present, list presentation SHALL show the consistent type value.
 
-### UC-WL-02: Filter by Tag
-**Trigger:** User selects one or more tags from the filter bar  
-**Behavior:**
-- Filter is applied client-side on the already-loaded list
-- A piece is shown if it contains **all** selected tags
-- Selecting the same tag again deselects it
-- When no tags are selected, all pieces are shown
+### WL-REQ-04 — Structured filtering model
+Filtering SHALL operate on `TagRef[]` structure, not plain string arrays.
 
-**Tag list in filter bar:**
-- Show only tags that exist on at least one piece
-- Always include the type tags (`text`, `poem`, `song`) if any piece has that type
-- Sort tags alphabetically, with type tags shown first
-- Type tags and user-defined tags are filtered through one unified matching model; the type badge is only a UI distinction, not a separate filtering system
+Filter controls SHALL support:
+- type tags (`kind="type"`)
+- user tags (`kind="user"`)
 
----
+Type and user filters SHALL NOT rely on mixed plain-string matching.
 
-### UC-WL-03: Navigate to Work
-**Trigger:** User taps the title area of a list item  
-**Behavior:**
-- Navigate to visualization mode for the selected piece
+### WL-REQ-05 — User tag matching rules
+User tag filter matching SHALL be case-insensitive on `TagRef.value`.
 
----
+Type tags SHALL match by normalized type value (`text | poem | song`).
 
-### UC-WL-04: Delete Piece from List
-**Trigger:** User taps the delete action on a list item  
-**Behavior:**
-- Show a confirmation dialog: "Are you sure you want to delete this work? This action cannot be undone."
-- If confirmed: execute UC-PM-06 (delete piece + cascade annotations), return to list
-- If cancelled: dismiss dialog, no changes
+### WL-REQ-06 — Filter application behavior
+Selected filters SHALL be applied client-side to loaded list data.
 
-**Rule:** The delete action is always visible per list item — no swipe gesture required. Simple and explicit.
+A piece SHALL match only when it satisfies all active filter criteria.
 
----
+Clearing all filters SHALL restore full list visibility.
 
-### UC-WL-05: Navigate to Edit from List
-**Trigger:** User taps the edit action on a list item  
-**Behavior:**
-- Navigate directly to editing mode for the selected piece (skip visualization)
+### WL-REQ-07 — Empty states
+The system SHALL support two empty states:
+1. **No pieces exist**
+   - show empty-list message
+   - show actions to create/import
+2. **No results after filtering**
+   - show no-results message
+   - preserve current filters until user clears/changes them
 
----
+### WL-REQ-08 — Song type visibility in list
+If pieces of type `song` exist, the Work List SHALL display them with type `song` badge like other types.
 
-### UC-WL-06: Empty State
-**Trigger:** No pieces exist (first launch or after deleting all pieces)  
-**Behavior:**
-- Show a message indicating the list is empty
-- Show two action shortcuts: "Create new work" and "Import .md file"
-- These shortcuts trigger UC-PM-01 and UC-PM-07 respectively
+Full song editing/viewing behavior is out of scope for this spec and SHALL be defined elsewhere.
+
+### WL-REQ-09 — Navigation behavior
+Tapping a list item SHALL navigate to the piece flow entry defined by editor-mode specs.
+
+List behavior SHALL remain independent from editor implementation internals.
+
+### WL-REQ-10 — Type change scope in list
+Work List SHALL NOT treat piece type changes as inline simple metadata edits.
+
+Any type-change flow SHALL follow dedicated piece-management constraints (disabled or future migration flow).
 
 ---
 
-## List Item Display
+## Scenarios
 
-Each list item shows:
-- `title` (primary label)
-- `type` as a styled badge (`text` | `poem` | `song`) representing the system-managed type tag
-- User-defined tags as smaller chips (if any)
-- `updatedAt` formatted as a relative date (e.g. "2 days ago")
+### WL-SCN-01 — Load and sort list
+**GIVEN** multiple pieces with different `updatedAt` values  
+**WHEN** user opens Work List  
+**THEN** items appear ordered by `updatedAt` descending.
+
+### WL-SCN-02 — Display tags and type
+**GIVEN** a piece with `TagRef(kind="type", value="poem")` and several user tags  
+**WHEN** list item is rendered  
+**THEN** type badge shows `poem` and up to 2–3 user tags are displayed.
+
+### WL-SCN-03 — Case-insensitive user tag filter
+**GIVEN** piece tagged with `TagRef(kind="user", value="Rock")`  
+**WHEN** user filters by `rock`  
+**THEN** piece matches and remains visible.
+
+### WL-SCN-04 — Combined type + user filter
+**GIVEN** active filters `type=text` and user tag `draft`  
+**WHEN** list is filtered  
+**THEN** only pieces matching both criteria are shown.
+
+### WL-SCN-05 — Empty list state
+**GIVEN** repository has zero pieces  
+**WHEN** user opens Work List  
+**THEN** empty-list state is shown with create/import actions.
+
+### WL-SCN-06 — Empty results after filter
+**GIVEN** pieces exist but none match active filters  
+**WHEN** filters are applied  
+**THEN** no-results state is shown while filters remain active.
+
+### WL-SCN-07 — Song entries visible
+**GIVEN** at least one piece of type `song`  
+**WHEN** Work List is displayed  
+**THEN** song pieces appear with `song` type badge without requiring full song editor behavior in this spec.
 
 ---
 
 ## Non-Goals (MVP)
-- No search by title or content
-- No sorting options (always by updatedAt desc)
-- No bulk selection for deletion
-- No drag-to-reorder
-- No grouping by type or language
-- No multi-piece export from the list (future — export lives inside each open piece in MVP)
+- No list-level editing of structured `Piece.content`
+- No inline type migration flow from list items
+- No dependence on Markdown/source rendering in list
+- No bulk operations (multi-delete, multi-export)
+- No advanced search/ranking beyond defined filters and default sort

@@ -1,293 +1,236 @@
 # Architecture — NoteDraftForge
 
 ## Stack (MVP)
-- **Framework:** Angular (latest stable)
-- **Persistence:** IndexedDB (via adapter)
+- **UI framework:** React (latest stable)
+- **Editor adapter:** Tiptap OSS (infrastructure adapter)
+- **Persistence adapter:** Dexie over IndexedDB
+- **Boundary validation:** Zod
+- **Styling:** Tailwind CSS
+- **UI primitives:** shadcn/ui
 - **Hosting:** GitHub Pages
-- **Backend:** none — not planned unless a clear reason emerges
-- **Mobile:** Angular in browser (MVP); Capacitor → Android APK when the product justifies it
+- **Backend:** none in MVP
+- **Mobile path:** React web first; Capacitor path first, React Native only if later justified
 
 ---
 
 ## Approach: Lightweight DDD + Hexagonal
 
-The goal is to learn and apply DDD and Hexagonal Architecture in a pragmatic way.
-Avoid ceremony. Avoid over-abstraction. Deliver working software.
+The goal is to apply DDD and Hexagonal Architecture pragmatically:
+small boundaries, explicit ports, replaceable adapters.
 
-### What this means in practice
-- The **domain** contains entities, value objects, and domain rules. Zero dependencies on Angular, IndexedDB, or any framework.
-- **Use cases** orchestrate domain logic. They depend on domain types and port interfaces only.
-- **Ports** are TypeScript interfaces that define what the application needs from the outside world.
-- **Adapters** implement port interfaces. They contain IndexedDB calls, file I/O, etc.
-- **Features** are Angular modules/components. They call use cases. They contain no domain logic.
-- Persistence, snapshot storage, and rendered output generation must stay behind ports/adapters; none of these concerns are allowed to leak into Angular components.
+### Hexagonal commitments
+- **Domain** contains entities, value objects, invariants, and domain rules only.
+- **Application** orchestrates use cases using domain types + ports only.
+- **Ports** are TypeScript interfaces describing required external capabilities.
+- **Infrastructure adapters** implement ports (Dexie persistence, Tiptap editor integration, future API/drive adapters, UI wiring).
+- **UI** is infrastructure: React components must not contain domain logic.
+- External systems are always behind ports/adapters.
+
+### Hard isolation rules
+- Domain must not import React, Tiptap, Dexie, Zod, or any framework package.
+- Domain must not store Tiptap JSON.
+- Domain content is structured domain data, not Markdown source text.
+- Markdown is import/export only.
 
 ---
 
-## Folder Structure
+## Explicit Layers
+
+1. **Domain**
+2. **Application**
+3. **Ports**
+4. **Infrastructure**
+   - **Persistence (Dexie)**
+   - **Editor (Tiptap)**
+   - **Validation boundary (Zod + mappers)**
+   - **UI (React + Tailwind + shadcn/ui + Zustand for UI state)**
+
+---
+
+## Folder Structure (target)
 
 ```
-src/app/
+src/
   core/
     domain/
-      piece/          ← Piece, PieceType, domain rules
-      anchor/         ← AnchorMark, anchor tag parsing and generation
-      annotation/     ← Annotation, all content types, kind rules
-      layer/          ← Layer, LayerKind, mapping rules, CSS class rules
-      snapshot/       ← PieceSnapshot, invalidation rules, CSS mechanism
     application/
-      use-cases/      ← one file per use case
-    ports/            ← TypeScript interfaces for all repositories
+    ports/
     infrastructure/
-      persistence/    ← IndexedDB adapters
-      renderer/       ← snapshot HTML generation (pure, no Angular deps)
-  features/
-    work-list/        ← WorkListComponent
-    work-view/        ← WorkViewComponent (loads snapshot, applies CSS)
-    work-editor/      ← WorkEditorComponent (Markdown editor, hides anchors)
-  shared/
+      persistence/     ← Dexie adapters implementing repository ports
+      editor/          ← Tiptap adapter(s), mapping editor model to app input/output
+      validation/      ← Zod schemas for external/boundary payloads
+      mappers/         ← external DTO/raw data <-> domain mapping
+  ui/
+    app/               ← React app shell
+    features/          ← React feature modules/components (no domain rules)
+    components/        ← shadcn/ui based primitives/composites
+    state/             ← Zustand stores (UI state only)
+    styles/            ← Tailwind config/theme utilities
 ```
 
 ### Import rules
-- `core/domain/` must NOT import from `core/infrastructure/`, `features/`, or Angular
-- `core/application/` must NOT import from `core/infrastructure/` or `features/`
-- `features/` may import from `core/application/` and `core/domain/` (types only)
-- `core/infrastructure/` may import from `core/domain/` and `core/ports/`
+- `core/domain/` must NOT import from any other layer.
+- `core/application/` may import only `core/domain/` and `core/ports/`.
+- `core/ports/` depends only on domain contracts/types when necessary.
+- `core/infrastructure/` may import `core/ports/` and `core/domain/`.
+- `ui/` may import application entrypoints and domain types, but must not implement business invariants.
 
 ---
 
-## MVP Ports Required
+## Ports and Adapter Responsibilities
 
-```ts
-// core/ports/piece-repository.port.ts
-interface PieceRepository {
-  getAll(): Promise<Piece[]>;
-  getById(id: string): Promise<Piece | null>;
-  save(piece: Piece): Promise<void>;
-  delete(id: string): Promise<void>;
-}
+### Persistence
+- Repositories are defined as ports.
+- Dexie adapters implement those ports.
+- Persistence remains replaceable (future backend/API adapters can replace Dexie without changing domain/application).
 
-// core/ports/anchor-repository.port.ts
-interface AnchorRepository {
-  getByPieceId(pieceId: string): Promise<AnchorMark[]>;
-  save(anchor: AnchorMark): Promise<void>;
-  delete(id: string): Promise<void>;
-  deleteByPieceId(pieceId: string): Promise<void>;
-}
+### Editor
+- Tiptap is an editor engine behind an adapter boundary.
+- Tiptap node/JSON schemas must be translated by adapters/mappers before application/domain use.
+- Domain model must never depend on ProseMirror/Tiptap data structures.
 
-// core/ports/annotation-repository.port.ts
-interface AnnotationRepository {
-  getByPieceId(pieceId: string): Promise<Annotation[]>;
-  save(annotation: Annotation): Promise<void>;
-  delete(id: string): Promise<void>;
-  deleteByPieceId(pieceId: string): Promise<void>;
-  deleteByAnchorId(anchorId: string): Promise<void>;
-}
+### Validation and mapping boundary
+- Zod is boundary validation only (storage read, import, backup restore, future API payloads).
+- Zod is not an infrastructure adapter implementing ports.
+- Mappers convert validated external DTO/raw data into domain objects.
+- Mandatory flow:
+  - **External data → Zod validation → Mapper → Domain**
+- Domain must not depend on Zod.
+- Domain invariants remain domain-level rules and are not replaced by Zod schemas.
 
-// core/ports/snapshot-repository.port.ts
-interface SnapshotRepository {
-  getByPieceId(pieceId: string): Promise<PieceSnapshot | null>;
-  save(snapshot: PieceSnapshot): Promise<void>;
-  deleteByPieceId(pieceId: string): Promise<void>;
-}
+### UI
+- Tailwind handles styling.
+- shadcn/ui provides base components owned/customized inside the repo.
+- UI layer must stay free of domain logic.
+
+### State management
+- Zustand is allowed for UI state only (modals, side panels, local selections, transient view state).
+- Zustand must not contain business logic, persistence rules, domain invariants, or use case orchestration.
+
+---
+
+## Data Flows
+
+### Local flow (MVP)
+
+```
+IndexedDB (Dexie) → Zod → Mapper → Domain → UI
 ```
 
-In MVP, the snapshot persistence adapter also owns bounded rendered recovery-copy
-storage. A dedicated backup port is only introduced if recovery flows later need
-their own explicit UI/use cases.
-No `LayerRepository` port is required in MVP: the 5 layer definitions are fixed
-compile-time constants and only their per-piece visibility state is persisted.
+### Future API flow (post-MVP direction)
+
+```
+API → React Query → Zod → Mapper → Domain → UI
+```
+
+In both flows, validation and mapping occur before domain construction/use.
 
 ---
 
 ## Use Case Pattern
 
-One class per use case. Constructor receives port interfaces via Angular DI.
+One class/function per use case in `core/application`.
+Use cases depend on ports, not adapter implementations.
 
 ```ts
-// core/application/use-cases/create-piece.use-case.ts
 export class CreatePieceUseCase {
   constructor(private readonly pieces: PieceRepository) {}
-  execute(input: CreatePieceInput): Promise<Piece> { ... }
+
+  async execute(input: CreatePieceInput): Promise<Piece> {
+    const piece = createPiece(input);
+    await this.pieces.save(piece);
+    return piece;
+  }
 }
 ```
 
 **Rules:**
-- Use cases validate inputs against domain rules before calling ports
-- Use cases must not contain UI logic or direct IndexedDB calls
-- Use cases must not import Angular
+- Use cases must not import React, Dexie, Tiptap, or Zod.
+- Use cases must not contain UI rendering concerns.
+- Use cases coordinate domain rules and ports only.
 
 ---
 
-## Snapshot Renderer
+## Rendering and Snapshot Boundary
 
-The renderer is a pure function (no Angular, no side effects) that takes a `Piece`
-and its `Annotation[]` and returns an HTML string.
-
-```ts
-// core/infrastructure/renderer/piece-renderer.ts
-function renderPiece(piece: Piece, annotations: Annotation[]): string {
-  // 1. Parse anchor tags from piece.content
-  // 2. For each anchor zone, render annotation elements with CSS classes
-  // 3. Return complete HTML string
-}
-```
-
-**Rules:**
-- The renderer lives in `core/infrastructure/renderer/` — it is infrastructure, not domain
-- It has no dependencies on Angular, IndexedDB, or any external service
-- It can be unit tested in isolation with plain TypeScript
-- All annotations are always rendered regardless of layer visibility
-- Layer visibility is always handled by CSS classes, never by conditional rendering
-- Rendered base-text fragments in visualization mode must expose raw-source offset metadata so the app can map DOM selections back to `Piece.content`
-- Any future intelligent anchor-correction capability must be a separate adapter/port, not part of the renderer and not part of the autosave/save loop
+- Snapshot generation is infrastructure.
+- Renderer consumes structured domain content + annotations and outputs static HTML.
+- Layer visibility is CSS-driven and persisted per piece.
+- No assumption that Markdown is internal source of truth.
+- No `AnchorMark` architecture dependency.
 
 ---
 
-## Snapshot Lifecycle
+## Snapshot Lifecycle (MVP defaults)
 
-Two independent timers are used in editing mode:
-- **Content autosave debounce (`800ms`)**: persists `Piece.content` and `updatedAt` after typing pauses.
-- **Snapshot inactivity debounce (`5s`)**: regenerates `PieceSnapshot` after no content/annotation/anchor changes.
+Two independent timers in edit mode:
+- **Content autosave debounce (`800ms`)**
+- **Snapshot inactivity debounce (`5s`)**
+
+High-level flow:
 
 ```
-User edits content in editing mode
-  → content autosave debounce (800ms)
-  → increment Piece.revision and update updatedAt
-  → PieceRepository.save(piece with updatedAt)
-  → run anchor integrity pass for the same content revision
-  → persist any derived needsReview annotation updates before any snapshot regeneration for that revision
-  → snapshot inactivity debounce (5s, reset on each relevant change)
-  → SnapshotInvalidationService marks snapshot as stale
-  → SnapshotGenerationService generates new snapshot in background
-  → SnapshotRepository.save()
+User edits content
+  → autosave debounce
+  → revision/update timestamps
+  → persist through repository ports (Dexie adapter behind ports)
+  → snapshot invalidation
+  → snapshot generation in background
+  → snapshot save through SnapshotRepository port
 
-User creates/edits/deletes/resolves an annotation
-  → update Piece.updatedAt and increment Piece.revision
-  → persist affected Piece / AnchorMark / Annotation entities through ports
-  → if visualization mode is active, apply immediate overlay feedback on the current view
-  → snapshot inactivity debounce (5s, reset on each relevant change)
-  → SnapshotInvalidationService marks snapshot as stale
-  → SnapshotGenerationService generates new snapshot in background
-  → SnapshotRepository.save()
+User updates annotation
+  → persist via ports
+  → optional immediate overlay feedback in current view
+  → snapshot invalidation
+  → background regeneration
 
-MVP persistence note:
-- Multi-entity annotation flows are best-effort and sequential; no cross-repository transaction or rollback guarantee is required in MVP
-- If a later persist step fails, the UI shows a visible error, keeps already-persisted state unchanged, and the automatic persistence flow retries on the next relevant save cycle
-
-User exits editing mode with pending changes
-  → immediate background snapshot generation (no wait)
-  → SnapshotRepository.save()
-
-User enters editing mode with no snapshot yet
-  → trigger first background snapshot generation immediately
-  → keep annotation actions disabled until the first snapshot is ready
-
-User opens visualization mode
-  → load Piece + PieceSnapshot from ports
-  → if snapshot exists and is current: inject HTML into view container (no Angular rendering)
-  → if snapshot exists but sourceRevision < Piece.revision: inject current HTML immediately and regenerate in background
-  → if no snapshot exists: show base text in read-only mode, disable annotation actions, generate first snapshot in background
-  → apply CSS hide classes based on PieceSnapshot.layerVisibility when a snapshot is available
-  → maintain up to 3 rendered recovery copies per piece in the snapshot storage layer; prune the oldest copy automatically when the limit is exceeded
-
-User toggles a layer
-  → update PieceSnapshot.layerVisibility
-  → add/remove CSS class on container element
-  → SnapshotRepository.save() (only layerVisibility field changed)
-  → zero HTML re-render
+User toggles layer visibility
+  → update layerVisibility state
+  → apply/remove CSS class
+  → persist visibility state
+  → no full HTML rerender
 ```
-
----
-
-## Double-Action Protection
-
-All user-triggered actions (save annotation, delete, resolve needsReview, create piece)
-must be protected against duplicate execution from double-taps or rapid clicks.
-
-**Rule:** Use an `isProcessing` flag or RxJS `exhaustMap` on all action triggers.
-A second trigger while an action is in progress must be silently ignored.
-No duplicate modals, no duplicate persists, no duplicate navigation.
 
 ---
 
 ## Testing Strategy
 
-### What to test (required)
-- **Domain logic** — pure TypeScript, no Angular, no mocks needed:
-  - Anchor tag parsing and generation
-  - `display` derivation for `ChordContent`
-  - Annotation content validation per kind
-  - Snapshot invalidation rules
-- **Use cases** — with mocked port interfaces:
-  - Input validation
-  - Correct port method calls and sequencing
-  - Cascade delete behavior
+### Required
+- **Domain tests:** invariants and pure domain behavior.
+- **Application tests:** use case orchestration with mocked ports.
+- **Architecture boundary tests:** enforce import rules between layers.
 
-### What not to test in MVP
-- Angular components (brittle, low ROI at this stage)
-- IndexedDB adapters (integration test territory, not unit)
-- The renderer HTML output (visual, better verified manually)
+### Optional in MVP
+- Infrastructure integration tests (Dexie/Tiptap adapter behavior) when risk justifies.
 
-### Failure handling baseline
-- Adapters may return errors or rejected promises, but use cases must translate them into simple UI outcomes
-- MVP error handling stays intentionally lightweight: inline validation for bad input, banners/toasts for recoverable runtime failures, blocking screen only for fatal storage unavailability on launch
-
-### Architecture tests
-Use ESLint rules or a lightweight tool to enforce import boundaries:
-- `core/domain/` imports nothing outside itself
-- `core/application/` imports nothing from `core/infrastructure/` or `features/`
-
-This prevents domain drift — the most common failure mode in hexagonal architecture.
+### Avoid
+- Coupling tests to UI implementation details where behavior can be asserted at application/domain level.
 
 ---
 
 ## What to Avoid in MVP
 
-- Generic repositories (`BaseRepository<T>`)
-- Abstract base classes for use cases
-- Event buses or CQRS patterns
-- Lazy-loaded domain modules
-- Any pattern that adds indirection without a concrete current benefit
-
----
-
-## Future-Aware Constraints
-
-- `Piece` has no reference to workspace, collection, or ordering
-- All ports are designed so a future adapter (Google Drive, backend) replaces the IndexedDB adapter with no use case changes
-- No workspace folder or file in MVP codebase
+- Framework leakage into domain/application.
+- Storing editor-native JSON as domain state.
+- Business logic inside React components or Zustand stores.
+- Treating Markdown as canonical internal storage.
+- Tight coupling to Dexie, Tiptap, or Zod in domain.
 
 ---
 
 ## Technical Roadmap (not MVP — direction only)
 
-### Google Drive Sync
-- Primary cross-device sync — no backend required
-- OAuth tokens stored on device (IndexedDB or secure browser storage)
-- On app start: check Drive for updates, merge with local if Drive is newer
-- On create/update: write to IndexedDB immediately, sync to Drive async
-- Offline: persist locally, sync on reconnect
-- `SyncRepository` port defined when specced
+- **Google Drive Sync:** future persistence/sync adapter option when cross-device support is needed.
+- **AI Integration (BYOK):** future adapter using structured content + domain metadata as context (still outside MVP scope).
+- **Mobile path:** React web first, Capacitor if useful, React Native only if justified later.
+- **Snapshot timing settings:** future user preference for generation timing (e.g., on-exit only / 5s / 2s).
+- **Backend:** not planned in MVP, but possible later by replacing/adding adapters behind ports.
 
-### AI Integration (BYOK)
-- No backend proxy — user provides their own API key
-- Key stored on device only, never transmitted to any server owned by this project
-- Context built from structured Markdown + domain metadata
-- **Legal note:** before any public release, UX copy and privacy policy must clearly inform the user that keys are stored on their device only. This is the primary legal protection against liability claims.
-- `AiPort` interface defined when specced
+---
 
-### Mobile (Android)
-- Path: Angular web app → Capacitor → Android APK
-- No rewrite required
-- iOS only if the product grows to justify it
+## Future-Aware Constraints
 
-### Snapshot Generation Timing (user-configurable)
-- On exit only (slow devices)
-- After 5 seconds of inactivity (default)
-- After 2 seconds of inactivity (fast devices)
-- User sets preference in app settings
-
-### Backend
-- Not planned
-- Hexagonal architecture ensures a backend adapter can be added without changing use cases
+- Keep adapters replaceable (Dexie now, backend/API later).
+- Keep editor replaceable (Tiptap now, alternative adapter later).
+- Keep validation replaceable/evolvable at boundaries.
+- Preserve hexagonal boundaries as the project grows.

@@ -1,141 +1,127 @@
 # Spec: Editor Modes
 
-> References: `openspec/domain-model.md`, `openspec/terminology.md`
+> References: `openspec/domain-model.md`, `openspec/architecture.md`, `openspec/specs/annotation-system/spec.md`
 
 ## Purpose
-Define the two modes for viewing and editing a Piece, and the rules governing what is allowed in each.
+Define behavior for `editing` and `visualization` modes using structured `PieceContent`, infrastructure-driven snapshot rendering, and `AnnotationTarget`-based annotation interactions.
 
 ---
 
-## Modes (MVP)
+## Requirements
 
-There are exactly **two modes** in the MVP:
+### EM-REQ-01 — Mode set (MVP)
+The system SHALL provide exactly two modes in MVP:
+- `visualization`
+- `editing`
 
-| Mode | User intent | Text editable | Annotations |
-|---|---|---|---|
-| `visualization` | reading, performing, adding interpretation | No (locked) | Add + resolve needsReview |
-| `editing` | writing, revising content | Yes | Full management |
+### EM-REQ-02 — Structured editing model
+In `editing` mode, the system SHALL edit structured `PieceContent` (not raw Markdown strings).
 
-> Note: `analysis` and `rehearsal` mentioned in earlier drafts are **not MVP modes**. They are future named layer-visibility presets, not distinct modes.
+User interaction SHALL be provided through an editor adapter (Tiptap).
 
----
+Editor-native payloads (Tiptap/ProseMirror JSON) SHALL be treated as external data and mapped to domain structures before persistence.
 
-## Visualization Mode
+Tiptap/ProseMirror JSON SHALL NOT be stored as domain state.
 
-### Entry
-- Default mode when opening a piece from the Works List
+### EM-REQ-03 — Editing mode responsibilities
+In `editing` mode, the system SHALL allow:
+- full content editing
+- annotation create/update/delete/resolve actions (subject to snapshot availability rule)
+- piece metadata updates through relevant specs
 
-### Behavior
-- `Piece.content` is rendered as read-only (no cursor, no text input)
-- Visible layers are rendered as overlays on the text
-- Auto-scroll is available (start/stop, fixed speed)
-- User can select a text range to add a new annotation (UC-AS-01)
-- In visualization mode, that selection is mapped back to raw `Piece.content` using source offsets emitted by the snapshot renderer
-- If no snapshot exists yet, visualization starts in a temporary base-text state and annotation actions stay disabled until the first snapshot is ready
-- If a snapshot is already visible, annotations added or resolved here must show immediate overlay feedback while full snapshot regeneration continues in the background
+In `editing` mode, the system SHALL NOT expose direct visualization-only controls (for example, auto-scroll and layer panel toggles).
 
-### Allowed actions
-- Toggle layer visibility (side panel)
-- Add annotation via text selection → Contextual FAB
-- Resolve `needsReview` annotations (UC-AS-04)
-- Start / stop auto-scroll
-- Switch to editing mode
+### EM-REQ-04 — Visualization mode responsibilities
+In `visualization` mode, the system SHALL render `PieceSnapshot.html` as read-only base content.
 
-Condition:
-- In the temporary no-snapshot state, all annotation actions are disabled until snapshot generation completes.
-- In the temporary no-snapshot state, layer visibility toggles are also disabled until the first snapshot is ready.
-- When the first snapshot becomes available, the view transitions subtly from base text to the interactive rendered visualization.
+`visualization` mode SHALL allow annotation overlay interactions (for example add/resolve) but SHALL NOT allow direct content editing.
 
-### Forbidden actions
-- Modify `Piece.content` directly (user text editing is locked)
-- Edit annotation content, kind, or layer
-- Delete existing annotations
+No Angular or Markdown-editor assumptions SHALL be used in mode behavior.
 
-Note: the system may insert anchor tags into `Piece.content` when the user
-adds an annotation in visualization mode. This is a system-level operation,
-not a user text edit, and is permitted.
+### EM-REQ-05 — Selection to AnnotationTarget mapping
+Selection-to-target mapping SHALL produce:
+- `TextRangeTarget`, or
+- `TextNodeTarget`
 
----
+For `TextRangeTarget`, offsets SHALL be calculated against plain text formed by concatenating `TextRun.text` values of the target block.
 
-## Editing Mode
+Inline marks SHALL NOT affect offset calculations.
 
-### Entry
-- User taps "edit" button from visualization mode
-- User is navigated directly here after creating a new piece (UC-PM-01)
+Selection mapping logic SHALL belong to infrastructure adapters (editor/renderer mapping), not domain.
 
-### Behavior
-- `Piece.content` is fully editable (Markdown editor)
-- Anchor integrity is checked in real time as content changes (UC-AS-06)
-- Annotation records are manageable, but interpretation layers are not rendered as live overlays in editing mode
-- If no snapshot exists when editing mode is entered, the first snapshot is generated in the background and annotation actions stay disabled until it is ready
+### EM-REQ-06 — Visualization selection mapping
+When selection happens over rendered snapshot content, renderer metadata SHALL expose enough information to resolve selections back to `AnnotationTarget` values.
 
-### Allowed actions
-- Edit `Piece.content`
-- Add annotation (UC-AS-01) only when a snapshot already exists
-- Edit annotation content (UC-AS-02) only when a snapshot already exists
-- Delete annotation (UC-AS-03) only when a snapshot already exists
-- Resolve `needsReview` annotations (UC-AS-04) only when a snapshot already exists
-- Update piece metadata (title, type, language, tags) — UC-PM-05
-- Switch to visualization mode
+### EM-REQ-07 — Snapshot dependency for annotation actions
+Annotation actions in both modes SHALL require a valid snapshot.
 
-### Forbidden actions
-- Auto-scroll (not available in editing mode)
-- Layer visibility toggles (layers are not shown in editing mode)
+If snapshot is not yet available, annotation actions SHALL remain disabled until the first snapshot is generated.
 
----
+Snapshot lifecycle SHALL be infrastructure-driven.
 
-## Mode Transition Rules
+The system SHALL NOT include anchor regeneration logic.
 
-| From | To | Trigger | Side effects |
-|---|---|---|---|
-| Works List | Visualization | User taps a piece | Load piece + annotations |
-| Visualization | Editing | User taps "Edit" button | None; content stays as-is |
-| Editing | Visualization | User taps "View" / "Done" | Persist any unsaved changes first |
-| Any mode | Works List | User taps "Back" / "Close" | Persist any unsaved changes first |
+### EM-REQ-08 — needsReview in mode flows
+`needsReview` status SHALL be tied to target resolution failures (unresolvable target or invalid bounds), not anchor corruption.
 
-**Rule:** Unsaved changes are never lost silently. Any navigation away from editing mode must trigger a persist before leaving. There is no explicit "save" button — persistence is automatic.
+The system SHALL NOT auto-repair `needsReview` in MVP.
+
+Resolution actions SHALL be explicit user flows:
+- confirm
+- retarget
+- delete
+
+### EM-REQ-09 — Transition and persistence safety
+Mode transitions SHALL preserve user changes.
+
+Leaving `editing` mode SHALL persist pending changes via normal persistence/autosave flow before navigation completes.
+
+Unsaved changes SHALL NOT be silently lost.
+
+### EM-REQ-10 — Markdown scope
+Markdown SHALL be treated only as external import/export format concern.
+
+Markdown SHALL NOT be treated as internal editable source of truth in mode behavior.
 
 ---
 
-## Contextual FAB (selection-based)
+## Scenarios
 
-Appears when the user selects a text range. Available in both modes.
+### EM-SCN-01 — Open piece in visualization mode
+**GIVEN** a user opens a piece from the work list  
+**WHEN** the piece view loads  
+**THEN** the system enters `visualization` mode and renders `PieceSnapshot.html` as read-only content.
 
-| Action | Available in visualization | Available in editing |
-|---|---|---|
-| Add annotation (all kinds) | Yes, only when a snapshot exists | Yes, only when a snapshot exists |
+### EM-SCN-02 — Enter editing mode and persist structured content
+**GIVEN** a piece in visualization mode  
+**WHEN** the user switches to `editing` mode and modifies content  
+**THEN** the editor adapter maps edits to structured `PieceContent` and persistence stores domain data (not editor JSON).
 
-The kind selection within the FAB determines the layer automatically.
-No separate "assign layer" action exists — kind and layer are always 1:1.
+### EM-SCN-03 — Create annotation from editor selection
+**GIVEN** a piece in editing mode with a valid snapshot  
+**WHEN** the user selects text and adds a `comment` annotation  
+**THEN** selection mapping resolves to `TextRangeTarget` or `TextNodeTarget`, validation runs, and annotation is persisted.
 
----
+### EM-SCN-04 — Create annotation from visualization selection
+**GIVEN** a piece in visualization mode with a valid snapshot  
+**WHEN** the user selects rendered text and adds an annotation  
+**THEN** renderer metadata enables mapping to `AnnotationTarget` and the annotation flow proceeds without direct content editing.
 
-## Global FAB
+### EM-SCN-05 — Annotation actions blocked without snapshot
+**GIVEN** a piece with no generated snapshot yet  
+**WHEN** user attempts annotation actions in either mode  
+**THEN** actions remain disabled until first snapshot generation completes.
 
-Always visible regardless of mode.
-
-| Action | Behavior |
-|---|---|
-| Create | UC-PM-01 |
-| Import .md | UC-PM-07 |
-
-Export is available from within an open piece (UC-PM-08), not from the Global FAB.
-Multi-piece export from the Work List is a future feature (not MVP).
-
----
-
-## Auto-scroll
-
-- Available in **visualization mode only**
-- Speed: single fixed speed in MVP (no configuration)
-- Controls: start / stop toggle
-- Auto-scroll does not affect the Piece or any data
+### EM-SCN-06 — needsReview resolution flow
+**GIVEN** an annotation that became unresolved after content changes  
+**WHEN** user opens review action  
+**THEN** user must explicitly confirm, retarget, or delete; no automatic repair is performed.
 
 ---
 
 ## Non-Goals (MVP)
-- No `analysis` mode
-- No `rehearsal` mode
-- No per-piece mode memory (always opens in visualization)
-- No split-view (visualization + editing simultaneously)
-- No configurable auto-scroll speed
+- No analysis/rehearsal extra modes
+- No split view (editing + visualization simultaneously)
+- No collaborative co-editing mode behavior
+- No advanced multi-target annotation composition in mode workflows
+- No requirement to expose editor-internal JSON structures to domain/application layers

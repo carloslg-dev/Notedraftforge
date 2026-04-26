@@ -12,15 +12,15 @@ Represents a single atomic creative unit.
 
 ```ts
 interface Piece {
-  id: string;           // UUID, generated on creation
-  title: string;        // non-empty string
+  id: string;             // UUID, generated on creation
+  title: string;          // non-empty string
   type: PieceType;
-  content: string;      // raw Markdown source with embedded AnchorMark tags
-  language: string;     // ISO 639-1 code (e.g. 'en', 'es', 'ca')
-  tags: string[];       // user-defined tags; type value is always included
-  createdAt: string;    // ISO 8601 datetime
-  updatedAt: string;    // ISO 8601 datetime
-  revision: number;     // monotonically increasing internal counter for snapshot freshness
+  content: PieceContent;  // structured canonical content (not raw Markdown)
+  language: string;       // ISO 639-1 code (e.g. 'en', 'es', 'ca')
+  tags: TagRef[];         // structured tags; type semantics are explicit via tag kind
+  createdAt: string;      // ISO 8601 datetime
+  updatedAt: string;      // ISO 8601 datetime
+  revision: number;       // monotonically increasing internal counter for snapshot freshness
 }
 
 type PieceType = 'text' | 'poem' | 'song';
@@ -29,144 +29,66 @@ type PieceType = 'text' | 'poem' | 'song';
 ### Rules
 - `id` is immutable after creation
 - `title` must be non-empty
-- `type` is always reflected as a tag in `tags`
-- `content` is the Markdown source with embedded anchor marks (see AnchorMark)
+- `content` is always structured domain data; editor formats and import/export formats are adapter concerns
 - `language` must be a valid ISO 639-1 two-letter code
+- `tags` uses explicit `TagRef.kind` semantics (no type-overloaded plain strings)
 - Translations of a piece are separate `Piece` entities (no link in MVP)
 - A `Piece` has no reference to any workspace or collection in the MVP
 - `updatedAt` reflects the last user-visible change to content, metadata, or annotations
-- `revision` starts at `0` and increments on any content, annotation, or anchor change that invalidates the snapshot
+- `revision` starts at `0` and increments on any content or annotation change that invalidates the snapshot
 
 ---
 
-## AnchorMark
+## Structured piece content
 
-Represents a physical text zone delimited by tags embedded in `Piece.content`.
-Multiple annotations can reference the same AnchorMark.
-
-```ts
-interface AnchorMark {
-  id: string;       // format: "a" followed by a positive integer, e.g. "a1", "a2", "a42"
-                    // unique per piece, assigned sequentially by the system
-                    // never a UUID — must match regex /^a\d+$/ to ensure strip regex works
-  pieceId: string;
-}
-```
-
-### Embedded format in Piece.content
-
-```
-<!--a1s-->voy<!--a1e-->
-<!--a2s--><!--a2e-->   ← empty anchor (e.g. instrumental measure, no lyrics)
-```
-
-- `<!--{id}s-->` = anchor start
-- `<!--{id}e-->` = anchor end
-- Anchors may overlap (e.g. an intention spanning several chord anchors)
-- Empty anchors (start immediately followed by end) are valid and common
-
-### Export rule
-When exporting to `.md`, all anchor tags are stripped with a single regex:
-```
-/<!--a\d+[se]-->/g → ""
-```
-The exported Markdown is clean — no anchor syntax visible to the user.
-
-### needsReview trigger
-If an edit corrupts an anchor tag (e.g. deletes `<!--a1s-->` but not `<!--a1e-->`),
-all annotations referencing that anchorId must be marked `status: 'needsReview'`.
-
-### Cascade rule
-- Deleting a `Piece` deletes all its `AnchorMark` and `Annotation` entities
-- Deleting an `AnchorMark` marks all its referencing `Annotation` entities as `needsReview`
-
----
-
-## Layer
-
-Represents an independent visual channel. Each layer has its own visibility toggle
-and groups exactly one annotation kind.
+`Piece.content` is a discriminated union by piece type.
 
 ```ts
-interface Layer {
-  id: LayerKind;
-  kind: AnnotationKind;
+type PieceContent = TextPieceContent | PoemPieceContent | SongPieceContent;
+
+interface TextPieceContent {
+  kind: 'text';
+  blocks: TextBlock[];
 }
 
-type LayerKind =
-  | 'chord'
-  | 'meter'
-  | 'breath'
-  | 'intention'
-  | 'comments';
-```
+interface PoemPieceContent {
+  kind: 'poem';
+  blocks: TextBlock[];
+}
 
-### Fixed layers (MVP)
+interface SongPieceContent {
+  kind: 'song';
+  sections: SongSection[];
+}
 
-| id (LayerKind) | kind (AnnotationKind) | UI name | Default visible |
-|---|---|---|---|
-| `chord` | `chord` | Chord | true |
-| `meter` | `meter` | Meter | false |
-| `breath` | `breath` | Breath | false |
-| `intention` | `intent` | Intention | false |
-| `comments` | `comment` | Comments | false |
-
-Note: `Layer.id` and `Layer.kind` share the same value for all layers except
-`intention` (id) → `intent` (kind) and `comments` (id) → `comment` (kind).
-This is intentional: `id` is the layer identifier, `kind` is the annotation kind it groups.
-
-### Rules
-- Layers are fixed in the MVP. Users cannot create, rename, or delete layers.
-- Each layer renders exactly one annotation kind.
-- Layer visibility is **per-piece**, persisted in `PieceSnapshot.layerVisibility`.
-- Toggling a layer updates `PieceSnapshot.layerVisibility` and applies a CSS class — it does NOT regenerate the snapshot HTML.
-- Layers are fixed definitions (5 compile-time records). Visibility state lives only in `PieceSnapshot.layerVisibility`.
-
-### Visual rendering per layer
-
-**layer-chord + layer-meter:**
-When both are visible and two annotations share the same anchorId, rendered in one
-measure box — chord on the left, meter on the right. Independent in the data model;
-visual grouping is a rendering concern only.
-
-**layer-breath:**
-Rendered as a small marker inside or adjacent to the anchor zone.
-Displays `S` (short) or `L` (long) in a distinct color.
-
-**layer-intention:**
-Rendered as a label above the text. Vertical offset increases if chord/meter boxes
-are visible in the same range. Can span multiple anchor zones.
-
-**layer-comments:**
-Rendered as a label above the text. Same vertical logic as intention.
-Visually distinct from intention (technical/editorial style).
-Future: AI-generated comments appear here with a distinct AI indicator.
-
-### Future layer (not MVP)
-- `layer-dynamics` — volume/intensity line (crescendo, decrescendo, steady),
-  rendered inside measure boxes, can span multiple anchors.
-
----
-
-## Annotation
-
-Represents information attached to an AnchorMark zone in a Piece.
-
-```ts
-interface Annotation {
+interface TextBlock {
   id: string;
-  pieceId: string;
-  anchorId: string;          // references AnchorMark.id
-  kind: AnnotationKind;
-  content: AnnotationContent;
-  layerId: LayerKind;
-  status: AnnotationStatus;
+  kind: 'paragraph' | 'line' | 'heading' | 'quote';
+  runs: TextRun[];
 }
 
-type AnnotationKind = 'chord' | 'meter' | 'breath' | 'intent' | 'comment';
-type AnnotationStatus = 'valid' | 'needsReview';
+interface TextRun {
+  id: string;
+  text: string;
+  marks?: TextMark[];
+}
 
-// chord
+type TextMark = 'bold' | 'italic';
+
+interface SongSection {
+  id: string;
+  kind: 'intro' | 'verse' | 'pre-chorus' | 'chorus' | 'bridge' | 'outro' | 'custom';
+  label?: string;       // required when kind = 'custom'
+  cells: SongCell[];
+}
+
+interface SongCell {
+  id: string;
+  text: string;
+  chord?: ChordContent; // owned by the SongCell, not by Annotation
+  meter?: MeterContent; // owned by the SongCell, not by Annotation
+}
+
 interface ChordContent {
   root: MusicalRoot;
   modifiers: MusicalModifier[];   // ordered, may be empty
@@ -183,6 +105,145 @@ type MusicalModifier = 'sharp' | 'flat' | 'minor' | 'major' | 'seventh';
 
 // meter — free text, e.g. "4/4", "3/4", "2/4"
 type MeterContent = string;
+```
+
+### Content rules
+- `TextPieceContent` and `PoemPieceContent` share block/run primitives and remain structurally distinct by discriminator
+- `TextRun` may carry optional inline marks (`bold`, `italic`) through `marks`
+- Song structure is represented through `SongSection` and `SongCell`
+- `SongCell` is the atomic musical/textual unit in songs
+- `chord` and `meter` live on `SongCell` when present
+- Markdown may be used for import/export, but never as internal source of truth
+
+---
+
+## TagRef
+
+Structured tag reference used by `Piece.tags`.
+
+```ts
+interface TagRef {
+  kind: TagKind;
+  value: string;
+}
+
+type TagKind = 'type' | 'user';
+```
+
+### Rules
+- `value` must be non-empty
+- `kind: 'type'` is reserved for type categorization semantics
+- `kind: 'user'` is for free user-defined tags
+
+---
+
+## AnnotationTarget
+
+Represents canonical structured targets for annotations.
+
+```ts
+type AnnotationTarget =
+  | TextRangeTarget
+  | TextNodeTarget
+  | SongCellTarget
+  | SongCellRangeTarget;
+
+interface TextRangeTarget {
+  kind: 'text-range';
+  blockId: string;
+  startOffset: number;   // inclusive
+  endOffset: number;     // exclusive
+}
+
+interface TextNodeTarget {
+  kind: 'text-node';
+  blockId: string;
+  runId?: string;
+}
+
+interface SongCellTarget {
+  kind: 'song-cell';
+  sectionId: string;
+  cellId: string;
+}
+
+interface SongCellRangeTarget {
+  kind: 'song-cell-range';
+  sectionId: string;
+  startCellId: string;
+  endCellId: string;
+}
+```
+
+### Rules
+- `AnnotationTarget` is the only canonical annotation-target model in the domain
+- Embedded anchor tags are not part of the source-of-truth domain model
+- Target references must resolve within the same `Piece`
+- For `TextRangeTarget`, `startOffset < endOffset` is required
+- `TextRangeTarget.startOffset` and `endOffset` are measured against the plain text obtained by concatenating all `TextRun.text` values in the referenced `TextBlock`
+- Inline marks (`TextRun.marks`) do not affect offset calculation
+- `TextRun` splits exist only for inline formatting and must not define annotation boundaries
+
+---
+
+## Layer
+
+Represents an independent visual channel. Each layer has its own visibility toggle
+and groups exactly one annotation kind or visual channel.
+
+```ts
+interface Layer {
+  id: LayerKind;
+  source: LayerSourceKind;
+}
+
+type LayerKind =
+  | 'chord'
+  | 'meter'
+  | 'breath'
+  | 'intention'
+  | 'comments';
+
+type AnnotationKind = 'breath' | 'intent' | 'comment';
+type SongCellPropertyKind = 'chord' | 'meter';
+type LayerSourceKind = AnnotationKind | SongCellPropertyKind;
+```
+
+### Fixed layers (MVP)
+
+| id (LayerKind) | source (LayerSourceKind) | UI name | Default visible |
+|---|---|---|---|
+| `chord` | `chord` | Chord | true |
+| `meter` | `meter` | Meter | false |
+| `breath` | `breath` | Breath | false |
+| `intention` | `intent` | Intention | false |
+| `comments` | `comment` | Comments | false |
+
+Note: `chord` and `meter` layers are visual channels driven by `SongCell` data in song content.
+
+### Rules
+- Layers are fixed in the MVP. Users cannot create, rename, or delete layers.
+- Layer visibility is **per-piece**, persisted in `PieceSnapshot.layerVisibility`.
+- Toggling a layer updates `PieceSnapshot.layerVisibility` and applies a CSS class — it does NOT regenerate the snapshot HTML.
+
+---
+
+## Annotation
+
+Represents interpretation metadata attached to a structured `AnnotationTarget` in a `Piece`.
+
+```ts
+interface Annotation {
+  id: string;
+  pieceId: string;
+  target: AnnotationTarget;
+  kind: AnnotationKind;
+  content: AnnotationContent;
+  layerId: LayerKind;
+  status: AnnotationStatus;
+}
+
+type AnnotationStatus = 'valid' | 'needsReview';
 
 // breath — always chosen explicitly by the user, never derived
 type BreathContent = 'S' | 'L';
@@ -194,8 +255,6 @@ type IntentContent = string;
 type CommentContent = string;
 
 type AnnotationContent =
-  | ChordContent
-  | MeterContent
   | BreathContent
   | IntentContent
   | CommentContent;
@@ -205,41 +264,26 @@ type AnnotationContent =
 
 | kind | content type | constraint | AI can write |
 |---|---|---|---|
-| `chord` | `ChordContent` | root required; modifiers ordered per rules | No |
-| `meter` | `MeterContent` | non-empty string | No |
 | `breath` | `BreathContent` | must be `S` or `L`, always user-chosen | No |
 | `intent` | `IntentContent` | non-empty string, personal | Never |
 | `comment` | `CommentContent` | non-empty string | Future yes |
-
-### ChordContent rules
-- `root` must be one of: `A`, `B`, `C`, `D`, `E`, `F`, `G`
-- `modifiers` order: `[alteration?, mode?, extension?]`
-  - alteration (max 1): `sharp` or `flat` — mutually exclusive
-  - mode (max 1): `minor` or `major` — mutually exclusive
-  - extension (max 1): `seventh`
-- `display` derived from root + modifiers in English notation:
-  - `sharp`→`#`, `flat`→`b`, `minor`→`m`, `major`→`M`, `seventh`→`7`
-  - Example: `{root:'C', modifiers:['sharp','minor','seventh']}` → `display:"C#m7"`
-- `display` is stored and recomputed when root or modifiers change
 
 ### Default layer per kind
 
 | kind | default layerId (LayerKind) |
 |---|---|
-| `chord` | `chord` |
-| `meter` | `meter` |
 | `breath` | `breath` |
 | `intent` | `intention` |
 | `comment` | `comments` |
 
 ### Layer assignment rule
-An annotation of kind `chord` can only belong to layer `chord`, and so on.
-The kind determines the layer. No cross-kind assignments are allowed.
+An annotation must belong to a layer whose `source` equals the annotation `kind`.
+No cross-kind assignments are allowed.
 
 ### General rules
-- `anchorId` must reference an existing `AnchorMark` in the same piece
+- `target` must reference an existing structured location in the same piece
 - `status` defaults to `valid` on creation
-- Multiple annotations of different kinds can reference the same `anchorId`
+- Multiple annotations of different kinds can reference the same target
 
 ---
 
@@ -251,10 +295,10 @@ Used in visualization mode for instant, zero-render-cost display.
 ```ts
 interface PieceSnapshot {
   pieceId: string;
-  html: string;                           // static HTML, all annotations included
+  html: string;                                // static HTML, all annotations included
   layerVisibility: Record<LayerKind, boolean>; // per-piece layer state
-  sourceRevision: number;                 // exact Piece.revision used to generate this snapshot
-  generatedAt: string;                    // ISO 8601
+  sourceRevision: number;                      // exact Piece.revision used to generate this snapshot
+  generatedAt: string;                         // ISO 8601
 }
 ```
 
@@ -267,7 +311,6 @@ interface PieceSnapshot {
 Snapshot must be regenerated when:
 - `Piece.content` changes
 - Any `Annotation` of that piece is created, updated, or deleted
-- Any `AnchorMark` of that piece is created or deleted
 
 Snapshot is NOT invalidated by:
 - Layer visibility toggle
@@ -279,15 +322,15 @@ Revision consistency rule:
 ### CSS visibility mechanism
 Each annotation element in the HTML carries a CSS class for its layer kind:
 ```html
-<span class="ndf-annotation ndf-layer-chord">Am</span>
-<span class="ndf-annotation ndf-layer-meter">2/4</span>
-<span class="ndf-annotation ndf-layer-chord ndf-needs-review">G</span>
+<span class="ndf-annotation ndf-layer-breath">S</span>
+<span class="ndf-annotation ndf-layer-intention">crescendo emocional</span>
+<span class="ndf-annotation ndf-layer-comments ndf-needs-review">revisar dicción</span>
 ```
 The piece container carries hide classes based on `layerVisibility`:
 ```css
 /* needsReview annotations always visible regardless of layer toggle */
-.ndf-piece.ndf-hide-chord     .ndf-annotation.ndf-layer-chord:not(.ndf-needs-review)     { display: none; }
-.ndf-piece.ndf-hide-meter     .ndf-annotation.ndf-layer-meter:not(.ndf-needs-review)     { display: none; }
+.ndf-piece.ndf-hide-chord     .ndf-song-cell-chord                                { display: none; }
+.ndf-piece.ndf-hide-meter     .ndf-song-cell-meter                                { display: none; }
 .ndf-piece.ndf-hide-breath    .ndf-annotation.ndf-layer-breath:not(.ndf-needs-review)    { display: none; }
 .ndf-piece.ndf-hide-intention .ndf-annotation.ndf-layer-intention:not(.ndf-needs-review) { display: none; }
 .ndf-piece.ndf-hide-comments  .ndf-annotation.ndf-layer-comments:not(.ndf-needs-review)  { display: none; }
@@ -305,14 +348,14 @@ User-configurable snapshot generation timing:
 
 ## Invariants
 
-1. A `Piece` has zero or more `AnchorMark` entities.
+1. A `Piece` has structured `PieceContent` by discriminator (`text`, `poem`, `song`).
 2. A `Piece` has zero or more `Annotation` entities.
-3. A `Piece` with zero annotations is a valid, normal Markdown document.
-4. An `Annotation` belongs to exactly one `Piece`, one `AnchorMark`, and one `Layer`.
-5. An `Annotation`'s `kind` must match its `Layer`'s `kind`.
-6. Multiple annotations of different kinds may share the same `AnchorMark`.
+3. A `Piece` with zero annotations is valid.
+4. An `Annotation` belongs to exactly one `Piece`, one `AnnotationTarget`, and one `Layer`.
+5. An `Annotation`'s `kind` must match its `Layer`'s compatible kind.
+6. Multiple annotations of different kinds may share the same `AnnotationTarget`.
 7. `Layer` definitions are fixed and visibility is per-piece, stored in `PieceSnapshot`.
-8. `Piece.content` may contain anchor tags. Exported `.md` files never contain anchor tags.
-9. The semantic content of `Piece.content` (excluding anchor tags) must never be modified by the annotation system.
+8. Markdown is an import/export concern only, never the domain source of truth.
+9. `chord` and `meter` values belong to `SongCell` in song content.
 10. There are exactly 5 layers in the MVP. They are fixed and always exist.
 11. `PieceSnapshot.sourceRevision` must match `Piece.revision` at generation time.

@@ -1,103 +1,121 @@
 # Spec: Layer Visibility
 
-> References: `openspec/domain-model.md`, `openspec/terminology.md`
-> Persistence and snapshot rules: `openspec/specs/snapshot-and-layer-state/spec.md`
+> References: `openspec/domain-model.md`, `openspec/specs/annotation-system/spec.md`, `openspec/specs/snapshot-and-layer-state/spec.md`
 
 ## Purpose
-Allow the user to independently show or hide each annotation layer per piece,
-and persist those preferences across sessions.
+Define unified per-piece visibility behavior for fixed MVP layers across annotation-driven and song-cell-driven rendering.
 
 ---
 
-## Layers (fixed — MVP)
+## Requirements
 
-There are exactly 5 layers. They always exist and cannot be created, renamed, or deleted.
+### LV-REQ-01 — Fixed layer set
+The system SHALL provide exactly 5 fixed layers in MVP:
+- `chord`
+- `meter`
+- `breath`
+- `intention`
+- `comments`
 
-| LayerKind | AnnotationKind | UI name | Default visible |
-|---|---|---|---|
-| `chord` | `chord` | Chord | true |
-| `meter` | `meter` | Meter | false |
-| `breath` | `breath` | Breath | false |
-| `intention` | `intent` | Intention | false |
-| `comments` | `comment` | Comments | false |
+Layers SHALL NOT be user-created, deleted, or renamed in MVP.
 
-**Each layer is toggled independently.** Activating one layer has no effect on any other.
+### LV-REQ-02 — Unified layer source model
+Layer sources SHALL be:
+- Annotation-driven layers: `breath`, `intention`, `comments`
+- SongCell-driven layers: `chord`, `meter`
 
-**Visibility is per-piece**, stored in `PieceSnapshot.layerVisibility`.
-There is no global layer state — each piece remembers its own visibility configuration.
+`chord` and `meter` visibility SHALL control rendering of `SongCell` properties, not annotation entities.
+
+### LV-REQ-03 — Visibility storage
+Layer visibility SHALL be stored in `PieceSnapshot.layerVisibility` as per-piece state.
+
+Layer visibility SHALL be persisted through `SnapshotRepository`.
+
+The system SHALL NOT use a separate layer repository.
+
+### LV-REQ-04 — Toggle behavior
+When a user toggles a layer, the system SHALL:
+- update `PieceSnapshot.layerVisibility`
+- apply/remove container class `ndf-hide-{layer}`
+- persist updated snapshot visibility state
+- avoid HTML regeneration
+
+Toggling one layer SHALL NOT mutate visibility of other layers.
+
+### LV-REQ-05 — CSS rendering contract
+Visibility control SHALL use container hide classes:
+- `ndf-hide-chord`
+- `ndf-hide-meter`
+- `ndf-hide-breath`
+- `ndf-hide-intention`
+- `ndf-hide-comments`
+
+Rendered elements SHALL use:
+- Annotation layers: `.ndf-annotation` + `.ndf-layer-{layerKind}`
+- SongCell layers: `.ndf-song-cell-chord` and `.ndf-song-cell-meter`
+
+### LV-REQ-06 — needsReview override
+Annotations with `status='needsReview'` SHALL remain visible regardless of layer visibility state.
+
+This override SHALL apply only to annotation-driven layers.
+
+### LV-REQ-07 — Default visibility values
+Default layer visibility for a new piece SHALL be:
+- `chord = true`
+- `meter = false`
+- `breath = false`
+- `intention = false`
+- `comments = false`
+
+### LV-REQ-08 — Mode interaction
+Layer toggles SHALL be available only in `visualization` mode.
+
+`editing` mode SHALL NOT expose layer-visibility controls.
+
+### LV-REQ-09 — No-regeneration / no-domain-mutation rule
+Layer visibility changes SHALL be purely visual state updates.
+
+Layer visibility changes SHALL:
+- NOT regenerate snapshot HTML
+- NOT mutate domain content/entities
+- NOT trigger snapshot invalidation
+
+### LV-REQ-10 — Snapshot availability gate
+If no snapshot exists yet, layer toggle controls SHALL remain disabled until first snapshot generation completes.
 
 ---
 
-## Visual rendering per layer
+## Scenarios
 
-### layer-chord + layer-meter
-- When both are visible and two annotations share the same anchorId: one measure box — chord left, meter right.
-- When only one is visible: the box shows only that annotation.
-- When neither is visible: no box is rendered.
+### LV-SCN-01 — Toggle annotation layer
+**GIVEN** visualization mode with existing snapshot  
+**WHEN** user toggles `breath` off  
+**THEN** system updates `layerVisibility.breath`, applies `ndf-hide-breath`, persists snapshot visibility, and does not regenerate HTML.
 
-### layer-breath
-- Rendered as a small marker inside or adjacent to the anchor zone.
-- Displays `S` (short) or `L` (long) in a distinct color.
+### LV-SCN-02 — Toggle song-cell layer
+**GIVEN** visualization mode with song content  
+**WHEN** user toggles `chord` off  
+**THEN** `.ndf-song-cell-chord` elements are hidden via CSS and annotation records are unchanged.
 
-### layer-intention
-- Rendered as a label above the text.
-- Vertical offset increases if chord/meter boxes are visible in the same range.
-- Can span multiple anchor zones.
-- Visually distinct from comments (personal/private style).
+### LV-SCN-03 — needsReview remains visible
+**GIVEN** an annotation in `needsReview` state on `comments` layer  
+**WHEN** `comments` layer is toggled off  
+**THEN** that warning annotation remains visible.
 
-### layer-comments
-- Rendered as a label above the text, same vertical logic as intention.
-- Visually distinct from intention (technical/editorial style).
-- Future: AI-generated comments appear here with a distinct AI indicator.
+### LV-SCN-04 — Independent toggles
+**GIVEN** current visibility has `meter=false` and `breath=true`  
+**WHEN** user toggles `meter` on  
+**THEN** `breath` visibility remains unchanged.
 
-### General rendering rules
-- The snapshot HTML always contains ALL annotations regardless of visibility state.
-- Layer visibility is controlled exclusively by CSS classes on the container — not by conditional rendering.
-- If all layers are hidden, no annotation overlays are painted; base text is unaffected.
-- Piece.content is never hidden or modified by layer rendering.
-- CSS class toggles must be immediate (zero HTML re-render).
-- See `openspec/specs/snapshot-and-layer-state/spec.md` for the full CSS contract.
-
----
-
-## Use Cases
-
-### UC-LV-01: Toggle Layer Visibility
-**Trigger:** User taps the toggle for a layer in the side panel
-**Available in:** visualization mode only
-**Behavior:**
-- Flip the layer's value in PieceSnapshot.layerVisibility
-- Add or remove the CSS hide class on the piece container immediately
-- Persist updated PieceSnapshot via SnapshotRepository.save()
-- Zero HTML re-render — CSS only
-
-**Rule:** Toggling one layer never affects any other layer's visibility.
-**Rule:** Does NOT invalidate or regenerate the snapshot HTML.
-**Rule:** If the piece has no snapshot yet, layer toggles stay disabled until the first snapshot is ready.
-
----
-
-### UC-LV-02: Load Layer State for a Piece
-**Trigger:** User opens a piece in visualization mode
-**Behavior:**
-- Load PieceSnapshot via SnapshotRepository.getByPieceId(pieceId)
-- If snapshot exists: apply layerVisibility as CSS classes on the container
-- If no snapshot exists yet (new piece, never viewed): keep the default values in memory, but keep the layer toggle UI disabled until the first snapshot is generated
-
----
-
-## Side Panel
-
-- Accessible in visualization mode only
-- Shows all 5 layers with UI name and independent visibility toggle
-- Layer names are localized (UI language, not piece language)
-- Order in panel: Chord, Meter, Breath, Intention, Comments
+### LV-SCN-05 — No snapshot yet
+**GIVEN** a piece opened before first snapshot generation  
+**WHEN** user opens layer panel in visualization mode  
+**THEN** toggles are disabled until snapshot becomes available.
 
 ---
 
 ## Non-Goals (MVP)
-- No global layer state (per-piece only)
-- No custom layer creation
-- No layer reordering by the user
-- No color customization by the user
-- No dynamics layer (future)
+- No global/shared visibility presets across pieces
+- No custom layer creation or layer reordering
+- No user-defined layer colors/themes
+- No visibility logic based on Markdown or anchor entities

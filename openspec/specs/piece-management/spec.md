@@ -3,160 +3,135 @@
 > References: `openspec/domain-model.md`, `openspec/terminology.md`
 
 ## Purpose
-Allow the user to create, read, update, delete, import, and export Pieces (shown as "Works" in the UI).
+Define the canonical behavior for creating, reading, updating, deleting, importing, and exporting `Piece` entities using the structured domain model (`PieceContent`, `TagRef`, revision tracking). This spec is behavior source of truth and is independent from UI implementation details.
 
 ---
 
-## Use Cases
+## Requirements
 
-### UC-PM-01: Create Piece
-**Trigger:** User taps "create" in the Global FAB
+### PM-REQ-01 — Create piece
+The system SHALL allow creating a new `Piece` with:
+- `title`
+- `type` (`text | poem | song`)
+- empty structured content matching `type`
 
-**Creation modal:**
-The modal asks for 3 fields before creating the piece:
-- `title` — text input with placeholder "New piece" shown in muted grey. On focus the placeholder disappears and the user types their title. If the user saves without typing, "New piece" is used as the actual title value.
-- `type` — selector: `text | poem | song`, default `text`
-- `language` — selector: ISO 639-1 code, default `es` (future: user-configurable default in settings)
+The system SHALL initialize on creation:
+- `id` (UUID)
+- `createdAt` / `updatedAt` (ISO 8601 current datetime)
+- `revision = 0`
+- `tags` as `TagRef[]` including a system-managed type tag `TagRef(kind="type", value=<piece type>)`
 
-**Behavior on Save:**
-- Generate a new UUID for `id`
-- Set `content` to empty string
-- Set `tags` to `[type]` (type tag always present, system-managed)
-- Set `createdAt` and `updatedAt` to current datetime (ISO 8601)
-- Set `revision` to `0`
-- Persist via `PieceRepository.save()`
-- Navigate to editing mode for the new piece
+The system SHALL create empty structured content by type:
+- `text` → `TextPieceContent` with empty `blocks`
+- `poem` → `PoemPieceContent` with empty `blocks`
+- `song` → `SongPieceContent` with empty `sections`
 
-**Validation:**
-- `title`: if empty on save, use "New piece" as default — never reject for empty title
-- `type` must be one of `text | poem | song`
-- `language` must be a valid ISO 639-1 two-letter code
+### PM-REQ-02 — Persist structured content
+The system SHALL persist `Piece.content` as structured domain data (`PieceContent`).
 
----
+The system SHALL NOT persist raw Markdown as canonical `Piece.content`.
 
-### UC-PM-02: Read Piece List
-**Trigger:** User opens the Works List screen  
-**Behavior:**
-- Load all pieces via `PieceRepository.getAll()`
-- Display as a list, showing `title`, `type`, and `tags`
-- If the list is empty, display an empty state with a prompt to create or import
+### PM-REQ-03 — Read piece list
+When the user requests the work list, the system SHALL load pieces from `PieceRepository.getAll()` and expose piece metadata needed by application/UI layers.
 
----
+### PM-REQ-04 — Update piece content
+When piece content changes, the system SHALL:
+- persist updated structured `Piece.content`
+- update `updatedAt`
+- increment `Piece.revision`
 
-### UC-PM-03: Filter Pieces by Tag
-**Trigger:** User selects one or more tags in the filter UI  
-**Behavior:**
-- Filter the loaded list client-side (no new DB query)
-- A piece matches if it has ALL selected tags
-- Clearing all filters shows all pieces
+### PM-REQ-05 — Update piece metadata
+For MVP, metadata-only updates apply to:
+- `title`
+- `language`
+- user tags (`TagRef(kind="user", ...)`)
 
----
+When metadata-only fields change, the system SHALL persist those changes without content migration.
 
-### UC-PM-04: Update Piece Content
-**Trigger:** User edits text in editing mode  
-**Behavior:**
-- Update `Piece.content` with the new Markdown string
-- Update `updatedAt` to current datetime
-- Increment `revision`
-- Persist via `PieceRepository.save()` using autosave debounce (MVP default: `800ms`)
-- Trigger anchor integrity check (UC-AS-06)
+For MVP, changing `Piece.type` SHALL NOT be treated as a simple metadata update because it may require migration between `PieceContent` variants.
 
-**Ordering rule:**
-- The content save starts a single content-change cycle
-- Any `needsReview` updates derived from UC-AS-06 must be persisted before snapshot regeneration for that same cycle
+`Piece.type` changes are either:
+- disabled in MVP, or
+- handled by a dedicated future migration flow defined in a separate spec/use case.
 
----
+### PM-REQ-06 — Structured tags
+The system SHALL store tags as `TagRef` objects.
 
-### UC-PM-05: Update Piece Metadata
-**Trigger:** User edits title, type, language, or tags
-**Behavior:**
-- Apply the change to the relevant field
-- If `type` changes: remove the old type tag from `tags`, add the new type tag
-- Update `updatedAt`
-- Persist via `PieceRepository.save()`
+`TagRef` SHALL include:
+- `kind` (`type | user`)
+- `value`
 
-**Snapshot rule:**
-- Metadata-only changes do NOT increment `revision` and do NOT invalidate the current snapshot
+The system MUST keep exactly one system-managed type tag per piece and MUST allow user-defined tags as `kind="user"`.
 
-**Tag rules:**
-- The type tag (e.g. `"poem"`, `"song"`, `"text"`) is system-managed and cannot be removed by the user. It does not appear as a removable chip in the tag editor UI.
-- User-defined tags can be freely added and removed.
-- Type tags and user-defined tags share one unified filter model. In list/filter UIs, the type tag is displayed first as a badge, but matching logic is the same as for any other tag.
-- When the user types a new tag name, the system checks existing tags across all pieces (case-insensitive). If a match exists, the existing tag is linked — no duplicate is created.
-- Tag comparison is case-insensitive: `"Rock"` and `"rock"` are the same tag. The first-used casing is preserved as the canonical form.
+### PM-REQ-07 — Revision tracking
+The system SHALL increment `Piece.revision` when:
+- content changes
+- annotations change
 
-**Validation:**
-- `title`: if empty on save, use "New piece" as default
-- `type` must be one of `text | poem | song`
-- `language` must be a valid ISO 639-1 two-letter code
+Metadata-only changes (title/language/user tags) SHALL NOT increment `revision`.
 
----
+### PM-REQ-08 — Delete piece
+When a piece is deleted, the system SHALL delete the piece and all related persistence records through ports/adapters (annotations, snapshots, and any other piece-scoped artifacts).
 
-### UC-PM-06: Delete Piece
-**Trigger:** User confirms deletion of a piece
-**Behavior:**
-- Delete all annotations via `AnnotationRepository.deleteByPieceId(pieceId)`
-- Delete all anchor marks via `AnchorRepository.deleteByPieceId(pieceId)`
-- Delete the snapshot via `SnapshotRepository.deleteByPieceId(pieceId)`
-- Delete the piece via `PieceRepository.delete(id)`
-- Navigate back to the Works List
+### PM-REQ-09 — Markdown import
+The system SHALL accept Markdown as an external import format.
 
-**Rule:** Deletion is permanent. No soft delete in MVP.
+The system SHALL convert imported Markdown into structured `PieceContent`.
+
+Unsupported Markdown structures SHALL be ignored or simplified.
+
+Import defaults SHALL be:
+- `type = "text"`
+- structured text content (`TextPieceContent`)
+- system-managed type tag `TagRef(kind="type", value="text")`
+- `revision = 0`
+
+### PM-REQ-10 — Markdown export
+The system SHALL export structured `Piece.content` into Markdown as an external format.
+
+The export SHALL NOT include internal annotation metadata, system metadata, or adapter-specific/internal state.
+
+The export operation SHALL be read-only and SHALL NOT mutate stored piece data.
 
 ---
 
-### UC-PM-07: Import Markdown Files
-**Trigger:** User selects one or more `.md` files via the Global FAB import action  
-**Behavior (per file):**
-- Read the file content as a UTF-8 string
-- Normalize imported Markdown to the MVP-supported text-oriented subset when needed
-- Create a new `Piece` with:
-  - `title`: filename without the `.md` extension
-  - `content`: normalized Markdown content
-  - `type`: `text` (default, user can change after import)
-  - `language`: `es` (default, user can change after import)
-  - `tags`: `['text']`
-  - `createdAt` / `updatedAt`: current datetime
-  - `revision`: `0`
-- Persist via `PieceRepository.save()`
+## Scenarios
 
-**Rules:**
-- No deduplication. Importing the same file twice creates two pieces.
-- If a file cannot be read, skip it and show a non-blocking error for that file.
-- Import is intended for text-oriented Markdown only.
-- Unsupported complex structures may be simplified into plain text-oriented Markdown for MVP consistency.
-- Lists and bullets are not preserved as structured list semantics in MVP; they may be flattened into plain text lines during import normalization.
+### PM-SCN-01 — Create empty text piece
+**GIVEN** the user creates a new piece  
+**WHEN** type is `"text"`  
+**THEN** the system creates a `Piece` with `TextPieceContent` and empty `blocks`.
 
-**Normalization rules (MVP):**
-- Preserve paragraphs, headings, emphasis, inline links, and plain line breaks as text-oriented Markdown
-- Convert bullet and ordered list items into plain text lines, preserving order but removing list structure
-- Convert table rows into plain text lines by joining cells with ` | `
-- Remove unsupported HTML/media wrappers while preserving human-readable fallback text or URLs when available
+### PM-SCN-02 — Create piece with type tag
+**GIVEN** the user creates a new piece of type `"poem"`  
+**WHEN** creation is persisted  
+**THEN** the system assigns `TagRef(kind="type", value="poem")`.
 
----
+### PM-SCN-03 — Persist structured content update
+**GIVEN** an existing piece with structured content  
+**WHEN** content is edited  
+**THEN** the system persists updated `PieceContent` and increments `Piece.revision`.
 
-### UC-PM-08: Export Piece as Markdown
-**Trigger:** User triggers export from within the open piece (visualization or editing mode)
-**MVP scope:** export applies to the currently open piece only. Multi-piece export is disabled in MVP (UI entry point hidden or disabled — to be defined when specced).
+### PM-SCN-04 — Import markdown into structured model
+**GIVEN** the user imports a Markdown file  
+**WHEN** the file contains headings and paragraphs  
+**THEN** the system maps content into `TextBlock` and `TextRun` structures.
 
-**Behavior:**
-- Take `Piece.content` (which may contain anchor tags)
-- Strip all anchor tags using regex: `/<!--a\d+[se]-->/g → ""`
-- Export the clean Markdown string
-- Filename = `{piece.title}.md` (sanitize: replace `/`, `\`, `:` with `-`)
-- Trigger one file download
+### PM-SCN-05 — Export markdown from structured model
+**GIVEN** an existing piece with structured content and annotations  
+**WHEN** the user exports to Markdown  
+**THEN** the system outputs Markdown without internal annotation/system metadata.
 
-**Rules:**
-- Annotations are NOT included in the exported Markdown
-- Metadata (title, type, language, tags) is NOT included in the exported Markdown
-- Anchor tags are ALWAYS stripped — the exported file is clean Markdown
-- Export is a read-only operation; it does not modify the piece or its stored content
+### PM-SCN-06 — Revision on annotation change
+**GIVEN** a piece with current `revision = N`  
+**WHEN** an annotation is created, updated, or deleted  
+**THEN** the system persists `revision = N + 1` for the piece.
 
 ---
 
 ## Non-Goals (MVP)
-- No versioning or edit history
-- No duplicate detection on import
-- No metadata export (frontmatter, JSON sidecar, etc.)
-- No workspace or collection references on Piece
-- No sync or backend persistence
+- No version history or branching
+- No sync/backend persistence
+- No multi-piece export bundle
+- No workspace/collection ownership in `Piece`
+- No requirement to preserve all advanced Markdown constructs losslessly in MVP import

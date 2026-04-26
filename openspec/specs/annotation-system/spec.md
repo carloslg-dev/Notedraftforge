@@ -3,266 +3,144 @@
 > References: `openspec/domain-model.md`, `openspec/terminology.md`
 
 ## Purpose
-Allow the user to attach structured annotations to anchor-based text zones (AnchorMarks)
-within a Piece, grouped by independent fixed layers, with automatic integrity maintenance
-when the Piece content is edited.
+Define how annotations are created, validated, updated, deleted, rendered, and reviewed using the structured `AnnotationTarget` model. This spec is behavioral source of truth and does not depend on editor internals or legacy anchor-tag mechanisms.
 
 ---
 
-## Use Cases
+## Requirements
 
-### UC-AS-01: Add Annotation
-**Trigger:** User selects a text range and taps "add annotation" in the Contextual FAB
-**Available in:** both visualization mode and editing mode, only after the piece has at least one generated snapshot
+### AS-REQ-01 — Annotation target model
+The system SHALL use `AnnotationTarget` as the only annotation targeting mechanism.
 
-#### Step 1 — Kind selection (Contextual FAB)
-The FAB shows the 5 annotation kinds as tappable options:
-- `Chord`
-- `Meter`
-- `Breath`
-- `Intention`
-- `Comment`
+An `Annotation` SHALL reference:
+- `target: AnnotationTarget`
 
-The user selects a kind. This determines which modal form is shown.
+Supported target types in the domain model SHALL be:
+- `TextRangeTarget`
+- `TextNodeTarget`
+- `SongCellTarget`
+- `SongCellRangeTarget`
 
-#### Step 2 — Anchor resolution
-Before opening the modal, the system checks the selected text range:
+For MVP user-created annotation flows, the system SHALL support:
+- `TextRangeTarget`
+- `TextNodeTarget`
 
-- **If the range exactly matches an existing AnchorMark:** reuse that anchor.
-  No new anchor tag is inserted into `Piece.content`.
-- **If no AnchorMark exists for that range:** reserve a provisional anchor plan
-  for the selected range. The system prepares the new `AnchorMark.id` and
-  insertion points in memory, but does NOT modify `Piece.content` or persist
-  anything until the user saves the annotation.
-- **Empty range (start === end):** valid — creates a punctual anchor
-  (e.g. for instrumental measures with no lyrics: `<!--a2s--><!--a2e-->`).
+`SongCellTarget` and `SongCellRangeTarget` SHALL remain available in the domain model for future song flows, but full song annotation flows are out of MVP scope unless explicitly specced.
 
-**Note on visualization mode:** inserting anchor tags modifies `Piece.content`
-but this is a **system-level operation**, not a user text edit. The rule
-"text cannot be modified in visualization mode" refers to direct user editing
-of the text. System anchor insertion is permitted in both modes.
+The system SHALL NOT depend on anchor entities, embedded anchor tags, or anchor parsing logic.
 
-#### Selection-to-source mapping contract
-The annotation system always works with offsets over raw `Piece.content`.
+### AS-REQ-02 — Target resolution and validation
+On create/update, the system SHALL validate that the annotation target resolves inside the same piece.
 
-- In editing mode, the Markdown editor provides those offsets directly.
-- In visualization mode, the selection is resolved from the rendered snapshot DOM.
-- The snapshot renderer must emit selectable base-text fragments with:
-  - `data-src-start`: inclusive raw offset in `Piece.content`
-  - `data-src-end`: exclusive raw offset in `Piece.content`
-- Overlay annotation elements must be non-selectable and must not contribute to the mapped range.
-- Anchor tags themselves have no selectable footprint in visualization mode; the mapping skips over them and resolves to the surrounding raw content offsets.
+Validation SHALL include:
+- referenced `blockId` / `runId` / `sectionId` / `cellId` existence
+- valid offset bounds for text ranges
 
-**Rule:** `UC-AS-01` receives a normalized `{start, end}` pair over raw `Piece.content`
-before applying anchor reuse or anchor creation logic.
+If create/update receives an invalid target, the system SHALL reject the operation and return validation feedback.
 
-**Availability rule:** if the piece has no generated snapshot yet, add-annotation entry points stay disabled in both modes until the first snapshot is ready.
+For `TextRangeTarget`, offsets SHALL be measured against plain text produced by concatenating all `TextRun.text` values in the referenced `TextBlock`.
 
-#### Step 3 — Annotation modal
+Inline marks SHALL NOT affect offset calculations.
 
-**Layout rules:**
-- Mobile: bottom sheet, leaves selected text visible above when possible
-- Desktop: overlay so selected text remains visible below; pushes content down if near top
-- Tapping/clicking outside does nothing (no accidental dismiss)
-- Two explicit actions: **Save** and **Close**
-- Closing without saving discards silently (user chose Close explicitly)
-- Closing without saving also discards any provisional anchor plan created in Step 2
+### AS-REQ-03 — Annotation kinds (MVP)
+The system SHALL allow only these annotation kinds in MVP:
+- `breath`
+- `intent`
+- `comment`
 
-**Modal — Chord:**
-- Root selector: tag buttons `A B C D E F G`, one at a time
-- Modifier toggles:
-  - Alteration (mutually exclusive): `#` (sharp) / `b` (flat)
-  - Mode (mutually exclusive): `m` (minor) / `M` (major)
-  - Extension: `7` (seventh)
-- Live preview of composed chord (e.g. `C#m7`), updates as user taps
-- Manual text fallback: if parseable into root + modifiers → stored as structured; if not → inline error
-- Future (post-MVP): "Recent chords in this piece" quick-select section
+The system SHALL NOT treat `chord` or `meter` as annotation kinds.
 
-**Modal — Meter:**
-- Text input for rhythmic value (e.g. `4/4`, `3/4`, `2/4`), non-empty required
+### AS-REQ-04 — Chord/meter ownership and rendering
+The system SHALL treat `chord` and `meter` as `SongCell` properties, not annotations.
 
-**Modal — Breath:**
-- Two large tap targets: `S` (Short) / `L` (Long)
-- Always user-chosen — no automatic suggestion
+Rendering SHALL expose chord/meter through layer visibility as visual channels.
 
-**Modal — Intention:**
-- Multiline text input, non-empty required
-- Note: "This is personal — only you can see and write here"
+### AS-REQ-05 — Create annotation
+When a valid annotation create request is submitted, the system SHALL:
+- create annotation with UUID
+- persist `target`, `kind`, `content`, `layerId`, and `status='valid'`
+- update `Piece.updatedAt`
+- increment `Piece.revision`
+- persist annotation and piece changes through ports
+- mark snapshot as stale and trigger regeneration
 
-**Modal — Comment:**
-- Multiline text input, non-empty required
+### AS-REQ-06 — Update annotation
+When an annotation is updated, the system SHALL:
+- validate target and content
+- persist updated annotation
+- update `Piece.updatedAt`
+- increment `Piece.revision`
+- invalidate snapshot
 
-**Layer assignment:**
-The layer is fixed per kind — the modal shows no layer picker.
-Kind → layer mapping is defined in domain-model.md.
+`kind` SHALL be immutable after creation in MVP.
 
-#### Step 4 — Save
-- Validate all inputs (see below)
-- Generate UUID for annotation `id`
-- Set `anchorId` from the reused anchor or provisional anchor prepared in Step 2
-- Set `layerId` from kind (fixed mapping)
-- Set `status` to `valid`
-- If kind is `chord`: compute and store `display`
-- If a provisional anchor plan exists:
-  - Insert `<!--{id}s-->` and `<!--{id}e-->` into `Piece.content`
-  - Persist the new anchor via `AnchorRepository.save()`
-- Refresh `Piece.updatedAt`
-- Increment `Piece.revision`
-- Persist the updated `Piece` via `PieceRepository.save()`
-- Persist via `AnnotationRepository.save()`
-- Mark `PieceSnapshot` as stale → trigger regeneration
-- If the current view is visualization mode and a rendered snapshot is already visible:
-  - inject the new annotation as an immediate overlay on top of the current DOM
-  - keep the current snapshot visible while full regeneration runs in the background
-- Close modal
-- Render new annotation immediately in the current view
+### AS-REQ-07 — Delete annotation
+When an annotation is deleted, the system SHALL:
+- delete it by `id`
+- update `Piece.updatedAt`
+- increment `Piece.revision`
+- invalidate snapshot
 
-**Persistence rule (MVP):**
-- This flow uses best-effort sequential persistence across `Piece`, `AnchorMark`, and `Annotation`
-- No cross-repository rollback is required in MVP
-- If a later persist step fails, the UI shows a visible error, the already-persisted state is left unchanged, and the next automatic persistence cycle retries the remaining saves
+Delete behavior SHALL NOT include any anchor lifecycle/cascade logic.
 
-**Validation:**
-- `anchorId` must reference a valid `AnchorMark` in the same piece
-- `chord`: `root` required, modifiers valid per domain rules
-- `meter`: non-empty string
-- `breath`: must be `S` or `L`
-- `intent`: non-empty string
-- `comment`: non-empty string
+### AS-REQ-08 — needsReview trigger and behavior
+The system SHALL set `status='needsReview'` when an existing annotation target can no longer be resolved (for example, missing block/run/cell references or offsets out of bounds after later content changes).
+
+The system SHALL NOT attempt auto-repair in MVP.
+
+A `needsReview` annotation SHALL remain visible according to layer visibility rules and warning-state rendering.
+
+### AS-REQ-09 — Resolve needsReview
+The system SHALL allow resolving a `needsReview` annotation via explicit user action:
+- confirm current target as valid (if resolvable)
+- retarget annotation to a valid `AnnotationTarget`
+- delete annotation
+
+Resolve actions SHALL persist updates and invalidate snapshot.
+
+### AS-REQ-10 — Layer visibility
+Layer toggles SHALL update `PieceSnapshot.layerVisibility` and apply CSS visibility changes without regenerating HTML.
+
+`needsReview` annotations SHALL remain visually distinguishable.
 
 ---
 
-### UC-AS-02: Edit Annotation
-**Available in:** editing mode only
-**What can be edited:** `content` only. `kind` is immutable after creation — if a different kind is needed, delete and create a new annotation.
-**Behavior:**
-- Open annotation modal pre-populated with existing content value
-- Apply changes on Save
-- Re-validate content per kind rules
-- If kind is `chord` and root or modifiers changed: recompute and store `display`
-- Refresh `Piece.updatedAt`
-- Increment `Piece.revision`
-- Persist the updated `Piece` via `PieceRepository.save()`
-- Update via `AnnotationRepository.save()`
-- Mark `PieceSnapshot` as stale → trigger regeneration
-- `needsReview` status is NOT reset by editing — must be resolved via UC-AS-04
+## Scenarios
 
----
+### AS-SCN-01 — Create text-range annotation
+**GIVEN** a piece with structured text content  
+**WHEN** user creates a `comment` with `TextRangeTarget(blockId, startOffset, endOffset)`  
+**THEN** the system validates offsets against concatenated `TextRun.text`, persists annotation, and increments piece revision.
 
-### UC-AS-03: Delete Annotation
-**Available in:** editing mode only
-**Behavior:**
-- Delete via `AnnotationRepository.delete(id)`
-- If the deleted annotation was the last one referencing its `AnchorMark`:
-  - Remove the anchor tags from `Piece.content`
-  - Delete the `AnchorMark` via `AnchorRepository.delete(anchorId)`
-- Refresh `Piece.updatedAt`
-- Increment `Piece.revision`
-- Persist the updated `Piece` via `PieceRepository.save()`
-- Mark `PieceSnapshot` as stale → trigger regeneration
+### AS-SCN-02 — Reject out-of-bounds range
+**GIVEN** a piece text block whose plain-text length is `N`  
+**WHEN** user submits create/update with a `TextRangeTarget` whose offsets are outside `[0, N]`  
+**THEN** the operation is rejected with validation feedback and no annotation mutation is persisted.
 
----
+### AS-SCN-03 — Update annotation target
+**GIVEN** an existing `breath` annotation  
+**WHEN** user updates its target to another valid `TextRangeTarget` or `TextNodeTarget`  
+**THEN** the system persists the updated target, updates piece metadata/revision, and invalidates snapshot.
 
-### UC-AS-04: Resolve needsReview Annotation
-**Trigger:** User taps a needsReview annotation
-**Available in:** both visualization mode and editing mode, only after the piece has at least one generated snapshot
+### AS-SCN-04 — Delete annotation
+**GIVEN** an existing annotation  
+**WHEN** user deletes it  
+**THEN** the system deletes annotation only, updates piece revision, and performs no anchor-related cleanup.
 
-**Rationale:** users can add annotations from visualization mode, so resolving
-system-invalidated annotations there is consistent — no mode switch required.
+### AS-SCN-05 — needsReview on unresolved target
+**GIVEN** an annotation referencing a removed `blockId`  
+**WHEN** system validates annotation targets during load/update cycle  
+**THEN** annotation status becomes `needsReview` and remains visible with warning styling.
 
-**Options:**
-- **Confirm:** the current anchor position is acceptable → set `status` to `valid`
-- **Re-anchor:** user selects a new text range → create or reuse an `AnchorMark`
-  at the new range, update `anchorId`, set `status` to `valid`
-- **Delete:** remove the annotation (and its anchor if no other annotations reference it)
-
-**Rule:** No automatic resolution. The user must act explicitly.
-**Rule:** Every resolve action refreshes `Piece.updatedAt`, increments `Piece.revision`,
-persists the affected entities, and invalidates the snapshot.
-**Rule:** Confirm and re-anchor persist the updated annotation via `AnnotationRepository.save()`.
-**Rule:** If re-anchor creates or removes anchor tags in `Piece.content`, persist
-the updated `Piece` via `PieceRepository.save()`. If the previous anchor becomes
-unreferenced after the move, remove its tags and delete it.
-**Rule:** In visualization mode with an existing rendered snapshot, confirm and
-re-anchor actions update the current view immediately; full snapshot regeneration
-continues asynchronously in the background.
-
----
-
-### UC-AS-05: Toggle Layer Visibility
-**Trigger:** User taps the toggle for a layer in the side panel
-**Available in:** visualization mode only
-**Behavior:**
-- Flip the layer's value in `PieceSnapshot.layerVisibility`
-- Add or remove the corresponding CSS hide class on the piece container
-- Persist updated `PieceSnapshot.layerVisibility` via `SnapshotRepository.save()`
-- Zero HTML re-render — CSS only
-
-**Rule:** Does NOT invalidate or regenerate the snapshot HTML.
-
----
-
-### UC-AS-06: Maintain Anchor Integrity on Content Edit
-**Trigger:** `Piece.content` changes in editing mode
-**Behavior:** After each edit, the system evaluates anchor integrity with a conservative
-boundary-focused heuristic.
-
-#### Integrity check
-For anchors affected by the edited range:
-- Verify both `<!--{id}s-->` and `<!--{id}e-->` are still present in `Piece.content`
-- Verify start tag appears before end tag
-- If the edit clearly stays inside the anchor body and both boundary tags remain valid,
-  keep the annotation state unchanged
-- If a boundary tag is missing, out of order, or the system can no longer trust the
-  original boundary, mark all annotations referencing that `anchorId` as `status: 'needsReview'`
-- Do NOT automatically remove or repair the anchor tags
-
-Anchors clearly outside the edited zone are left untouched.
-
-#### Persistence and ordering
-- All annotations newly moved to `status: 'needsReview'` must be persisted via `AnnotationRepository.save()`
-- These derived status updates belong to the same content-change cycle that triggered the integrity check
-- The content change already incremented `Piece.revision`; integrity-driven `needsReview` updates for that same cycle do **not** increment it a second time
-- Any snapshot regeneration for that content-change cycle must wait until the corresponding `needsReview` persists have completed
-
-**Rule:** The integrity check may complete with a short delay if needed to keep typing
-responsive, but the final `needsReview` state must appear in place without requiring
-navigation or manual refresh.
-
----
-
-## needsReview Lifecycle
-
-| State | How entered | How exited |
-|---|---|---|
-| `valid` | on creation | stays valid unless anchor is corrupted |
-| `needsReview` | anchor tag corrupted by edit | user confirms, re-anchors (→ valid), or deletes |
-
-**UI rule:** `needsReview` annotations must be visually distinct (warning indicator).
-Never silently hidden. Visible in both modes.
-Only true boundary ambiguity should move an annotation into `needsReview`; edits that
-leave anchor boundaries intact must not be invalidated conservatively.
-
----
-
-## Double-Action Protection
-
-All annotation actions (save, delete, resolve) must be protected against duplicate
-execution from double-taps or rapid clicks.
-
-**Rule:** Use an `isProcessing` flag or RxJS `exhaustMap` on all action triggers.
-A second trigger while an action is in progress is silently ignored.
-No duplicate modals, no duplicate persists.
+### AS-SCN-06 — Chord/meter are not annotations
+**GIVEN** a song piece with `SongCell.chord` and `SongCell.meter` data  
+**WHEN** visualization layers are toggled  
+**THEN** chord/meter are rendered as song-cell visual properties, not as `Annotation` records.
 
 ---
 
 ## Non-Goals (MVP)
-- Anchor tag offsets are calculated on raw Markdown source, not on rendered HTML — the rendered HTML is not the source of truth for text positions
-- Exported `.md` files never contain annotations or anchor tags — only clean Markdown
-- No overlapping annotation conflict detection
-- No annotation history or versioning
-- No custom layer creation
-- No exportable annotations in structured format (JSON, XML, etc.)
-- No `dynamics` kind (future)
-- No AI-generated `intent` annotations (AI may only write `comment`, future)
-- No automatic S/L suggestion for `breath` — always user-chosen
+- No advanced range merging/splitting heuristics
+- No collaborative conflict resolution
+- No AI correction/auto-fix for invalid targets
+- No multi-target annotation composition beyond the defined `AnnotationTarget` variants
