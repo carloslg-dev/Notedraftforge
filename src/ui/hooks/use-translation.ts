@@ -62,7 +62,22 @@ const translations = {
     startBoundary: 'Start Boundary',
     endBoundary: 'End Boundary',
     previewLabel: 'Preview',
-    confirm: 'Confirm'
+    confirm: 'Confirm',
+    addBreath: 'Add Breath',
+    addIntent: 'Add Intention',
+    addComment: 'Add Comment',
+    breathTypeLabel: 'Breath Type',
+    shortPause: 'Short Pause (S)',
+    longPause: 'Long Pause (L)',
+    shortNoteLabel: 'Short Note / Floating Phrase',
+    extendedNoteLabel: 'Extended Note (Optional)',
+    intentPlaceholder: 'e.g., Soft tone, melancholic pause...',
+    commentPlaceholder: 'e.g., Rhythm adjustment, repeat line...',
+    extendedNotePlaceholder: 'Detailed explanation for performance...',
+    shortNoteRequired: 'Short note is required',
+    annotationCreated: 'Annotation created successfully',
+    save: 'Save',
+    saving: 'Saving...'
   },
   es: {
     works: 'Obras',
@@ -125,7 +140,22 @@ const translations = {
     startBoundary: 'Inicio de la selección',
     endBoundary: 'Fin de la selección',
     previewLabel: 'Vista previa',
-    confirm: 'Confirmar'
+    confirm: 'Confirmar',
+    addBreath: 'Añadir Respiración',
+    addIntent: 'Añadir Intención',
+    addComment: 'Añadir Comentario',
+    breathTypeLabel: 'Tipo de Respiración',
+    shortPause: 'Pausa Corta (S)',
+    longPause: 'Pausa Larga (L)',
+    shortNoteLabel: 'Nota Rápida / Frase Flotante',
+    extendedNoteLabel: 'Nota Extendida (Opcional)',
+    intentPlaceholder: 'Ej: Tono suave, pausa melancólica...',
+    commentPlaceholder: 'Ej: Ajuste de ritmo, repetir verso...',
+    extendedNotePlaceholder: 'Explicación detallada para la interpretación...',
+    shortNoteRequired: 'La nota rápida es obligatoria',
+    annotationCreated: 'Anotación creada correctamente',
+    save: 'Guardar',
+    saving: 'Guardando...'
   }
 };
 
