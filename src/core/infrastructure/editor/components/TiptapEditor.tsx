@@ -70,14 +70,14 @@ export function TiptapEditor({ initialContent, onUpdate }: TiptapEditorProps) {
   }
 
   return (
-    <div className="flex gap-3 w-full items-start" data-selection-epoch={selectionEpoch}>
+    <div className="flex gap-2 w-full items-start" data-selection-epoch={selectionEpoch}>
       {/* Editor Content Area */}
-      <div className="flex-grow border border-[#e8eaed] rounded-lg p-3 bg-white min-h-[250px] max-w-[calc(100%-48px)] overflow-x-hidden">
+      <div className="flex-grow min-h-[250px] max-w-[calc(100%-44px)] overflow-x-hidden p-0">
         <EditorContent editor={editor} />
       </div>
 
       {/* Mini Static Side Toolbar on the right */}
-      <div className="flex flex-col gap-1 p-1 bg-white border border-[#e8eaed] rounded-lg shadow-sm shrink-0 w-10 items-center sticky top-4">
+      <div className="flex flex-col gap-1 p-1 bg-white border border-[#e8eaed] rounded-lg shadow-sm shrink-0 w-9 items-center sticky top-2">
         <Button
           variant="ghost"
           size="sm"
