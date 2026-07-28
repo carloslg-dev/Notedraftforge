@@ -131,7 +131,6 @@ export function WorkViewPage() {
   const [refineText, setRefineText] = useState('');
   const [refineStart, setRefineStart] = useState(0);
   const [refineEnd, setRefineEnd] = useState(0);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
 
   const hasSelectionMobile = !!selectionRect && !!selectedText;
@@ -146,27 +145,6 @@ export function WorkViewPage() {
       return () => clearTimeout(timer);
     }
   }, [hasSelectionMobile]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
-
-    const handleResize = () => {
-      const vv = window.visualViewport;
-      if (vv) {
-        const offset = window.innerHeight - vv.height;
-        setKeyboardHeight(Math.max(0, offset));
-      }
-    };
-
-    window.visualViewport.addEventListener('resize', handleResize);
-    window.visualViewport.addEventListener('scroll', handleResize);
-    handleResize();
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize);
-      window.visualViewport?.removeEventListener('scroll', handleResize);
-    };
-  }, []);
 
   useEffect(() => {
     const handleSelectionChange = () => {
@@ -392,7 +370,7 @@ export function WorkViewPage() {
                   top: `${Math.max(10, (selectionRect?.top ?? 0) - 12)}px`,
                   left: `${(selectionRect?.left ?? 0) + (selectionRect?.width ?? 0) / 2}px`,
                 }
-              : { bottom: `${keyboardHeight + 16}px` }
+              : { bottom: '16px' }
           }
         >
           <Button
