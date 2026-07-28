@@ -75,3 +75,7 @@
 .ndf-hide-breath    .ndf-layer-breath.ndf-needs-review    { display: revert; }
 .ndf-hide-intention .ndf-layer-intention.ndf-needs-review { display: revert; }
 .ndf-hide-comments  .ndf-layer-comments.ndf-needs-review  { display: revert; }
+
+.font-handwriting {
+  font-family: 'Caveat', cursive, sans-serif;
+}
