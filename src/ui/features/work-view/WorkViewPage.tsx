@@ -4,7 +4,7 @@ import { useWorkView } from './use-work-view';
 import { useUIStore } from '../../state/ui-store';
 import { useTranslation } from '@/ui/hooks/use-translation';
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Lightbulb, MessageSquare, Wind } from 'lucide-react';
+import { Lightbulb, MessageSquare, Wind, Settings } from 'lucide-react';
 import { TiptapEditor } from '../../../core/infrastructure/editor/components/TiptapEditor';
 import { PieceContent } from '../../../core/domain/types/';
 import { AutosavePieceUseCase } from '../../../core/application/piece-management/autosave-piece.use-case';
@@ -132,6 +132,7 @@ export function WorkViewPage() {
   const [refineStart, setRefineStart] = useState(0);
   const [refineEnd, setRefineEnd] = useState(0);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
+  const [isProcessingMode, setIsProcessingMode] = useState(false);
 
   const hasSelectionMobile = !!selectionRect && !!selectedText;
 
@@ -310,21 +311,33 @@ export function WorkViewPage() {
         <Button variant="ghost" onClick={handleBackClick} className="text-[#5f6368] hover:text-[#202124]">
           ← {t('works')}
         </Button>
-        <Button
-          variant={activeMode === 'editing' ? 'default' : 'outline'}
-          className={activeMode === 'editing' ? 'bg-[#1a73e8] hover:bg-[#1557b0] text-white border-0' : 'text-[#5f6368]'}
-          onClick={async () => {
-            if (activeMode === 'editing') {
-              await flushAutosave();
-              refresh();
-              await enterVisualization();
-            } else {
-              enterEditing(piece.id);
-            }
-          }}
-        >
-          {activeMode === 'editing' ? t('finishEditing') : t('editPiece')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={activeMode === 'editing' ? 'default' : 'outline'}
+            disabled={isProcessingMode}
+            className={activeMode === 'editing' ? 'bg-[#1a73e8] hover:bg-[#1557b0] text-white border-0' : 'text-[#5f6368]'}
+            onClick={async () => {
+              if (isProcessingMode) return;
+              try {
+                setIsProcessingMode(true);
+                if (activeMode === 'editing') {
+                  await flushAutosave();
+                  refresh();
+                  await enterVisualization();
+                } else {
+                  enterEditing(piece.id);
+                }
+              } finally {
+                setIsProcessingMode(false);
+              }
+            }}
+          >
+            {activeMode === 'editing' ? t('finishEditing') : t('editPiece')}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-[#5f6368]" onClick={() => toast.info(t('settings'))} title={t('settings')}>
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
       </nav>
 
       <header className="mb-3 md:mb-6 border-b border-[#e8eaed] pb-2 md:pb-4 px-4 md:px-3">

@@ -25,7 +25,7 @@ export function CreatePieceModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (isSubmitting || !title.trim()) return;
 
     try {
       setIsSubmitting(true);

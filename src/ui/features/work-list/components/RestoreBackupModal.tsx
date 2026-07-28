@@ -54,6 +54,7 @@ export function RestoreBackupModal({
   };
 
   const executeRestore = async () => {
+    if (isRestoring) return;
     let jsonString = '';
 
     if (activeTab === 'upload') {
