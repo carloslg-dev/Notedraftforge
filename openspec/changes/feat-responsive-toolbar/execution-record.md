@@ -15,7 +15,7 @@ feat-responsive-toolbar
 Status: approved
 Source: human
 Approved by: carloslg-dev
-Reason: User approved formatting selection state synchronization to highlight formatting buttons in real-time based on cursor position.
+Reason: User approved layout optimization to remove the double inner border card in TiptapEditor.tsx and shrink sidebar spacing to maximize writing canvas width on mobile.
 
 ---
 
@@ -66,6 +66,8 @@ PASS
 - Defer all database refetching (`refresh()`) calls to only execute when transitioning from editing to visualization mode. During active writing, the local rich text editor memory operates as the single source of truth, avoiding state updates that cause input resetting.
 - Increase the active input autosave debounce delay from `800ms` to `5000ms` (5 seconds) to decrease writing overhead and provide a stable writing environment.
 - Bind `selectionUpdate` and `transaction` editor events to a custom state epoch hook in `TiptapEditor.tsx`. This causes the sidebar formatting buttons to re-render dynamically on every cursor movement or styling change, highlighting active styling choices in real-time.
+- Remove duplicate inner card wrapping (borders, shadow, double margins and inner paddings) around the text canvas. This allows the editor to breathe directly inside the page card container, bleeding text to margins and expanding usable horizontal viewport width.
+- Shrink vertical toolbar spacing (`w-9` sidebar width, `gap-2` outer gap, `max-w-[calc(100%-44px)]` editor area constraint) to maximize line-width options for song writing and lyrics editing on small screens.
 
 ---
 
@@ -81,6 +83,7 @@ PASS
 - Asynchronous refreshes that update parent component records should avoid toggling general loader states during active editing sessions. Keeping loaders silent prevents component unmounting, which preserves focus context, selections, and virtual keyboard bindings.
 - During active content editing in WYSIWYG rich text systems, the editor component's memory should serve as the sole source of truth. Postponing state refreshes from database transactions until mode boundaries are crossed eliminates typing delays, content overwrites, and browser refokus issues.
 - React rich-text editor wrappers need event hooks linked to editor update hooks (like `selectionUpdate` or `transaction`) to prompt toolbar state refreshes. Subscribing to editor selection shifts ensures active style classes (like `bold`, `italic`, etc.) reflect the formatting of the text node currently underlying the user's cursor.
+- Redundant nested container borders and margins waste significant layout space, particularly on mobile screens. Stripping secondary background panels allows writing areas to reach their full horizontal potential.
 
 ## Task log range
 
@@ -90,4 +93,4 @@ Single task
 
 ## Date completed
 
-2026-07-24
+2026-07-28
