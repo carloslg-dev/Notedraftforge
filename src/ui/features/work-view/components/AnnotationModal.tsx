@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/ui/components/ui/button';
 import { useTranslation } from '@/ui/hooks/use-translation';
-import type { AnnotationKind, AnnotationTarget } from '../../../../core/domain/types/index';
+import type { AnnotationKind, AnnotationTarget, Annotation, BreathContent, NoteAnnotationContent } from '../../../../core/domain/types/index';
 import { CreateAnnotationUseCase } from '../../../../core/application/annotation-management/create-annotation.use-case';
+import { UpdateAnnotationUseCase } from '../../../../core/application/annotation-management/update-annotation.use-case';
 import { DexiePieceRepository } from '../../../../core/infrastructure/adapters/dexie/piece-repository';
 import { DexieAnnotationRepository } from '../../../../core/infrastructure/adapters/dexie/annotation-repository';
 import { Lightbulb, MessageSquare, Wind } from 'lucide-react';
@@ -14,6 +15,7 @@ interface AnnotationModalProps {
   pieceId: string;
   kind: AnnotationKind;
   target: AnnotationTarget | null;
+  annotationToEdit?: Annotation | null;
   onSuccess: () => void;
 }
 
@@ -23,6 +25,7 @@ export function AnnotationModal({
   pieceId,
   kind,
   target,
+  annotationToEdit,
   onSuccess
 }: AnnotationModalProps) {
   const { t } = useTranslation();
@@ -32,16 +35,35 @@ export function AnnotationModal({
   const [extendedNote, setExtendedNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen || !target) return null;
+  useEffect(() => {
+    if (annotationToEdit) {
+      if (annotationToEdit.kind === 'breath') {
+        const breathContent = annotationToEdit.content as BreathContent;
+        setMark(breathContent.mark || 'S');
+      } else {
+        const noteContent = annotationToEdit.content as NoteAnnotationContent;
+        setShortNote(noteContent.shortNote || '');
+        setExtendedNote(noteContent.extendedNote || '');
+      }
+    } else {
+      setShortNote('');
+      setExtendedNote('');
+      setMark('S');
+      setPosition('after');
+    }
+  }, [annotationToEdit, isOpen]);
+
+  if (!isOpen || (!target && !annotationToEdit)) return null;
 
   const getTitleAndIcon = () => {
+    const isEdit = !!annotationToEdit;
     switch (kind) {
       case 'breath':
-        return { title: t('addBreath'), icon: <Wind className="h-5 w-5 text-[#188038]" /> };
+        return { title: isEdit ? 'Editar Respiración' : t('addBreath'), icon: <Wind className="h-5 w-5 text-[#188038]" /> };
       case 'intent':
-        return { title: t('addIntent'), icon: <Lightbulb className="h-5 w-5 text-[#e37400]" /> };
+        return { title: isEdit ? 'Editar Intención' : t('addIntent'), icon: <Lightbulb className="h-5 w-5 text-[#e37400]" /> };
       case 'comment':
-        return { title: t('addComment'), icon: <MessageSquare className="h-5 w-5 text-[#1a73e8]" /> };
+        return { title: isEdit ? 'Editar Comentario' : t('addComment'), icon: <MessageSquare className="h-5 w-5 text-[#1a73e8]" /> };
     }
   };
 
@@ -60,10 +82,9 @@ export function AnnotationModal({
       setIsSubmitting(true);
       const pieceRepo = new DexiePieceRepository();
       const annotationRepo = new DexieAnnotationRepository();
-      const useCase = new CreateAnnotationUseCase(pieceRepo, annotationRepo);
 
       let finalTarget = target;
-      if (kind === 'breath' && target.kind === 'text-range') {
+      if (kind === 'breath' && target && target.kind === 'text-range') {
         const textRange = target;
         if (position === 'before') {
           finalTarget = {
@@ -86,14 +107,26 @@ export function AnnotationModal({
               ...(extendedNote.trim() ? { extendedNote: extendedNote.trim() } : {})
             };
 
-      await useCase.execute({
-        pieceId,
-        kind,
-        target: finalTarget,
-        content
-      });
+      if (annotationToEdit) {
+        const updateUseCase = new UpdateAnnotationUseCase(pieceRepo, annotationRepo);
+        await updateUseCase.execute({
+          annotationId: annotationToEdit.id,
+          pieceId,
+          content,
+          ...(finalTarget ? { target: finalTarget } : {})
+        });
+        toast.success('Anotación actualizada');
+      } else {
+        const createUseCase = new CreateAnnotationUseCase(pieceRepo, annotationRepo);
+        await createUseCase.execute({
+          pieceId,
+          kind,
+          target: finalTarget!,
+          content
+        });
+        toast.success(t('annotationCreated'));
+      }
 
-      toast.success(t('annotationCreated'));
       setShortNote('');
       setExtendedNote('');
       setMark('S');
@@ -101,7 +134,7 @@ export function AnnotationModal({
       onSuccess();
       onClose();
     } catch (err) {
-      console.error('Failed to create annotation:', err);
+      console.error('Failed to save annotation:', err);
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSubmitting(false);

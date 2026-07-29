@@ -4,7 +4,7 @@ import { useWorkView } from './use-work-view';
 import { useUIStore } from '../../state/ui-store';
 import { useTranslation } from '@/ui/hooks/use-translation';
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Lightbulb, MessageSquare, Wind, Settings, Trash2, X } from 'lucide-react';
+import { Lightbulb, MessageSquare, Wind, Settings, Trash2, X, Pencil } from 'lucide-react';
 import { TiptapEditor } from '../../../core/infrastructure/editor/components/TiptapEditor';
 import { PieceContent } from '../../../core/domain/types/';
 import { AutosavePieceUseCase } from '../../../core/application/piece-management/autosave-piece.use-case';
@@ -412,6 +412,16 @@ export function WorkViewPage() {
   const [annotationModalKind, setAnnotationModalKind] = useState<AnnotationKind>('intent');
   const [annotationTarget, setAnnotationTarget] = useState<AnnotationTarget | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
+  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
+
+  const handleEditAnnotation = () => {
+    if (!selectedAnnotation) return;
+    setEditingAnnotation(selectedAnnotation);
+    setAnnotationModalKind(selectedAnnotation.kind);
+    setAnnotationTarget(selectedAnnotation.target);
+    setIsAnnotationModalOpen(true);
+    setSelectedAnnotation(null);
+  };
 
   const handleDeleteAnnotation = async () => {
     if (!selectedAnnotation || !piece) return;
@@ -758,11 +768,18 @@ export function WorkViewPage() {
 
       <AnnotationModal
         isOpen={isAnnotationModalOpen}
-        onClose={() => setIsAnnotationModalOpen(false)}
+        onClose={() => {
+          setIsAnnotationModalOpen(false);
+          setEditingAnnotation(null);
+        }}
         pieceId={piece.id}
         kind={annotationModalKind}
         target={annotationTarget}
-        onSuccess={() => refresh()}
+        annotationToEdit={editingAnnotation}
+        onSuccess={() => {
+          refresh();
+          setEditingAnnotation(null);
+        }}
       />
 
       {selectedAnnotation && (
@@ -806,6 +823,15 @@ export function WorkViewPage() {
             )}
 
             <div className="flex justify-end gap-2 mt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEditAnnotation}
+                className="flex items-center gap-1 text-xs"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Editar
+              </Button>
               <Button
                 variant="destructive"
                 size="sm"
