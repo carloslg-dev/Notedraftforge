@@ -95,11 +95,11 @@ No annotation management or snapshot generation here — only the mode container
 | Work view component (shell) | **Done (#24)** | Container that switches between visualization and editing sub-views |
 | Editing mode — Tiptap editor | **Done (#25)** | Tiptap OSS adapter, structured content mapping, autosave debounce 800ms (D-15) |
 | Content autosave use case | **Done (#26)** | Debounce, persist `Piece.content`, increment `revision`, `updatedAt` update |
-| Selection toolbar component | **Open (#27)** | Contextual toolbar above selection; edit mode format actions (`bold`, `italic`, `underline`) / visualization mode annotation kinds; frosted white theme (EM-REQ-05, D-24) |
-| Selection Refinement modal | **Open (#28)** | Char-by-char boundary adjuster, 8-char context window, nudge ←→, confirm (EM-REQ-06) |
+| Selection toolbar component | **Done (#27)** | Contextual toolbar above selection; edit mode format actions (`bold`, `italic`, `underline`) / visualization mode annotation kinds; frosted white theme (EM-REQ-05, D-24) |
+| Selection Refinement modal | **Done (#28)** | Char-by-char boundary adjuster, 8-char context window, nudge ←→, confirm (EM-REQ-06) |
 | Language preference UI | **Done (#29)** | ES / EN segmented control in app header; persisted in UI state; does not infer or mutate `Piece.language` |
-| Settings placeholder | **Open (#30)** | Settings button in app header; no-op in MVP; reserved space for future settings |
-| Double-action protection | **Open (#31)** | `isProcessing` flag or debounce on all action triggers |
+| Settings placeholder | **Done (#30)** | Settings button in app header; no-op in MVP; reserved space for future settings |
+| Double-action protection | **Done (#31)** | `isProcessing` flag or debounce on all action triggers |
 
 ---
 
@@ -112,14 +112,14 @@ Creating, editing, deleting annotations and managing target integrity.
 
 | Issue | Status | Scope |
 |---|---|---|
-| Create annotation use case | **Open (#32)** | Validate target, persist annotation, immediate visual feedback in viz mode (D-03, AS-REQ-07) |
-| Annotation modal component | **Open (#33)** | Type selector (breath/intent/comment) → mark selector or shortNote + extendedNote fields (D-23, AS-REQ-06) |
+| Create annotation use case | **Done (#32)** | Validate target, persist annotation, immediate visual feedback in viz mode (D-03, AS-REQ-07) |
+| Annotation modal component | **Done (#33)** | Type selector (breath/intent/comment) → mark selector or shortNote + extendedNote fields (D-23, AS-REQ-06) |
 | Edit annotation use case | **Open (#34)** | Update content, validate, persist (AS-REQ-08) |
-| Delete annotation use case | **Open (#35)** | Remove annotation, update piece revision (AS-REQ-09) |
+| Delete annotation use case | **Done (#35)** | Remove annotation, update piece revision (AS-REQ-09) |
 | Target integrity pass | **Open (#36)** | Run after content save; mark `needsReview` on unresolvable target (D-02, AS-REQ-10) |
-| Resolve `needsReview` use case | **Open (#37)** | User confirms, retargets, or deletes; explicit flow only (AS-REQ-11) (Deferred / Backlog) |
-| Annotation rendering in visualization | **Open (#38)** | shortNote floating above text (Caveat font); extendedNote in sidebar on selection; `needsReview` always visible |
-| Layer visibility in annotation rendering | **Open (#39)** | CSS classes per layer kind; `ndf-needs-review` override |
+| Resolve `needsReview` use case | **Deferred (#37)** | User confirms, retargets, or deletes; explicit flow only (AS-REQ-11) (Deferred / Backlog) |
+| Annotation rendering in visualization | **Done (#38)** | shortNote floating above text (Caveat font); extendedNote in sidebar on selection; `needsReview` always visible |
+| Layer visibility in annotation rendering | **Done (#39)** | CSS classes per layer kind; `ndf-needs-review` override |
 
 ---
 
@@ -132,13 +132,13 @@ Snapshot generation pipeline, stale detection, fallback behavior, and layer togg
 
 | Issue | Status | Scope |
 |---|---|---|
-| Piece renderer | **Open (#40)** | Pure function: `Piece + Annotation[]` → HTML string; CSS classes per layer and status |
+| Piece renderer | **Done (#40)** | Pure function: `Piece + Annotation[]` → HTML string; CSS classes per layer and status |
 | Snapshot generation use case | **Open (#41)** | Generate `PieceSnapshot`, set `sourceRevision`, persist via port |
 | Snapshot invalidation service | **Open (#42)** | Detect stale snapshots (`sourceRevision < revision`); trigger regeneration; keep annotation actions disabled until current snapshot is ready |
 | Snapshot inactivity debounce | **Open (#43)** | 5s debounce in editing mode; immediate generation on exit |
 | Load snapshot in visualization | **Open (#44)** | Load + inject HTML; stale → inject current + regenerate in background |
 | No-snapshot fallback | **Open (#45)** | Show base text (read-only), disable annotation actions, generate first snapshot (D-04) |
-| Toggle layer visibility | **Open (#46)** | Update `layerVisibility`, apply CSS class on container, persist; zero re-render |
+| Toggle layer visibility | **Done (#46)** | Update `layerVisibility`, apply CSS class on container, persist; zero re-render |
 | ~~Recovery copies~~ | **Deferred** | Deferred to MVP2 — recovery-copy lifecycle will be designed once annotation-integrity flows are validated in practice (D-02) |
 
 ---
