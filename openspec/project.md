@@ -85,7 +85,7 @@ Implementation order and issue breakdown: `openspec/backlog.md`.
 ---
 
 ## Future (not MVP)
-- Workspace system: curated groupings of works (books, recitals, albums)
+- Workspace & Performance Flow system: hierarchical graph canvas, reading paths, composite nodes, and graph traceability for books, recitals, and albums (ref: `docs/proposals/workspace-performance-flow.md`)
 - AI integration: context-rich suggestions based on structured metadata
 - Versioning: edit history per piece
 - Backend + sync

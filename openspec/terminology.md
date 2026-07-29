@@ -33,9 +33,9 @@
 - **Rule:** Use `comment` as the AnnotationKind value. Never use `note` or `notes` for this concept in domain code.
 
 ### Workspace
-- **Context:** future — NOT MVP
-- **Definition:** A higher-level curated grouping of works (e.g. a poetry book, a recital set, an album draft)
-- **Rule:** Do not use this term in MVP code or specs. Reserved for future implementation.
+- **Context:** post-MVP
+- **Definition:** A higher-level curated grouping of works (e.g. a poetry book, a recital set, an album draft, performance scripts) represented as a hierarchical graph canvas with reading paths and graph traceability.
+- **Rule:** Do not use this term in MVP code or specs. Reserved for post-MVP implementation (ref: `docs/proposals/workspace-performance-flow.md`).
 
 ---
 
