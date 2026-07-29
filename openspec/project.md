@@ -77,6 +77,7 @@ Implementation order and issue breakdown: `openspec/backlog.md`.
 | Work list (list, filter, navigation) | `openspec/specs/work-list/spec.md` |
 | Layer visibility (toggle, rendering) | `openspec/specs/layer-visibility/spec.md` |
 | Snapshot and layer state (pre-render, CSS toggle, persistence) | `openspec/specs/snapshot-and-layer-state/spec.md` |
+| Performance flows & workspaces (canvas, graph traceability, composite nodes) | `openspec/specs/performance-flow/spec.md` |
 
 ## Non-Functional Requirements
 
