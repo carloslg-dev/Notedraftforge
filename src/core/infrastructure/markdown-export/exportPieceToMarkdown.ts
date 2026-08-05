@@ -1,6 +1,6 @@
-import { Piece, TextBlock, TextRun, TextMark } from '../../domain/types/index';
+import { Piece, TextBlock, TextRun, TextMark, TagRef } from '../../domain/types/index';
 
-export function exportPieceToMarkdown(piece: Piece): string {
+export function exportPieceToMarkdown(piece: Piece, options?: { includeFrontmatter?: boolean }): string {
   if (piece.type === 'song') {
     throw new Error('Song export not supported');
   }
@@ -11,7 +11,30 @@ export function exportPieceToMarkdown(piece: Piece): string {
   }
 
   const blocksMd = content.blocks.map(block => blockToMarkdown(block));
-  return blocksMd.join('\n\n');
+  const bodyMd = blocksMd.join('\n\n');
+
+  if (options?.includeFrontmatter) {
+    const userTags = piece.tags
+      .filter((t: TagRef) => t.kind === 'user')
+      .map((t: TagRef) => t.value);
+
+    const frontmatterLines = [
+      '---',
+      `id: "${piece.id}"`,
+      `title: "${piece.title.replace(/"/g, '\\"')}"`,
+      `type: "${piece.type}"`,
+      `language: "${piece.language}"`,
+      `revision: ${piece.revision}`,
+      `tags: [${userTags.map((t: string) => `"${t}"`).join(', ')}]`,
+      `createdAt: "${piece.createdAt}"`,
+      `updatedAt: "${piece.updatedAt}"`,
+      '---',
+      ''
+    ];
+    return frontmatterLines.join('\n') + bodyMd;
+  }
+
+  return bodyMd;
 }
 
 function blockToMarkdown(block: TextBlock): string {

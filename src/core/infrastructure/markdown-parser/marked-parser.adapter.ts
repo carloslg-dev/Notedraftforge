@@ -2,10 +2,12 @@ import { marked, Token } from 'marked';
 import type { TextBlock, TextRun, TextMark } from '../../domain/types/';
 import type { MarkdownParserPort } from '../../ports/';
 import { randomUUID } from '../../domain/uuid';
+import { parseYamlFrontmatter } from '../markdown/yaml-frontmatter';
 
 export class MarkedParserAdapter implements MarkdownParserPort {
   parse(markdown: string): TextBlock[] {
-    const tokens = marked.lexer(markdown);
+    const { body } = parseYamlFrontmatter(markdown);
+    const tokens = marked.lexer(body);
     const blocks: TextBlock[] = [];
 
     for (const token of tokens) {

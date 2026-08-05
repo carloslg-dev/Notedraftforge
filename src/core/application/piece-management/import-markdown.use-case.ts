@@ -1,6 +1,6 @@
-import type { Piece } from '../../domain/types/';
+import type { Piece } from '../../domain/types/index';
 import { createPiece } from '../../domain/factories';
-import type { PieceRepository, MarkdownParserPort } from '../../ports/';
+import type { PieceRepository, MarkdownParserPort } from '../../ports/index';
 
 export interface ImportMarkdownCommand {
   title: string;
@@ -23,9 +23,6 @@ export class ImportMarkdownUseCase {
       language: input.language
     });
 
-    // createPiece returns a text piece with empty blocks, revision 0.
-    // We recreate it to add the parsed blocks while maintaining immutability
-    // and keeping the revision as 0 as required by PM-REQ-09.
     const importedPiece: Piece = {
       ...piece,
       content: {

@@ -99,4 +99,29 @@ describe('ImportMarkdownUseCase', () => {
     const content = piece.content as TextPieceContent;
     expect(content.blocks).toHaveLength(0);
   });
+
+  it('imports markdown with YAML frontmatter headers preserving text content and structure', async () => {
+    const markdownContent = `---
+title: "Poema de la Noche"
+type: "poem"
+language: "es"
+tags: ["nocturno", "estrellas"]
+---
+La luna vaga solitaria.`;
+
+    const piece = await useCase.execute({
+      title: 'Poema de la Noche',
+      markdown: markdownContent,
+      language: 'es'
+    });
+
+    expect(piece.id).toBeDefined();
+    expect(piece.title).toBe('Poema de la Noche');
+    expect(piece.type).toBe('text');
+    expect(piece.language).toBe('es');
+    expect(piece.revision).toBe(0);
+    const content = piece.content as TextPieceContent;
+    expect(content.blocks).toHaveLength(2);
+    expect(content.blocks[0].runs[0].text).toBe('Hello');
+  });
 });

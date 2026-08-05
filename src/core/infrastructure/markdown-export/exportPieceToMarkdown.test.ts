@@ -174,4 +174,38 @@ describe('exportPieceToMarkdown', () => {
 
     expect(piece).toEqual(originalPiece);
   });
+
+  it('includes YAML frontmatter header when includeFrontmatter option is true', () => {
+    const piece: Piece = {
+      id: 'piece-frontmatter-1',
+      title: 'Obra con Metadatos',
+      type: 'poem',
+      language: 'es',
+      createdAt: '2026-08-05T14:40:00Z',
+      updatedAt: '2026-08-05T14:40:00Z',
+      revision: 1,
+      tags: [
+        { kind: 'type', value: 'poem' },
+        { kind: 'user', value: 'tag1' }
+      ],
+      content: {
+        kind: 'poem',
+        blocks: [
+          {
+            id: 'b1',
+            kind: 'paragraph',
+            runs: [{ id: 'r1', text: 'Texto del poema.' }]
+          }
+        ]
+      }
+    };
+
+    const output = exportPieceToMarkdown(piece, { includeFrontmatter: true });
+
+    expect(output).toContain('---');
+    expect(output).toContain('id: "piece-frontmatter-1"');
+    expect(output).toContain('title: "Obra con Metadatos"');
+    expect(output).toContain('tags: ["tag1"]');
+    expect(output).toContain('Texto del poema.');
+  });
 });
