@@ -5,6 +5,7 @@ node_modules/
 dist/
 .ai/
 .scannerwork/
+coverage/
 *.tmp
 sonar_issues.json
 all_issues_formatted.txt
