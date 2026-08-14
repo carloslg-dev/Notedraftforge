@@ -19,21 +19,88 @@ interface AnnotationModalProps {
   onSuccess: () => void;
 }
 
-export function AnnotationModal({
-  isOpen,
-  onClose,
-  pieceId,
-  kind,
-  target,
-  annotationToEdit,
-  onSuccess
-}: AnnotationModalProps) {
-  const { t } = useTranslation();
+function computeFinalTarget(
+  target: AnnotationTarget | null,
+  kind: AnnotationKind,
+  position: 'before' | 'after'
+): AnnotationTarget | null {
+  if (kind === 'breath' && target?.kind === 'text-range') {
+    const textRange = target;
+    if (position === 'before') {
+      return {
+        ...textRange,
+        endOffset: textRange.startOffset
+      };
+    }
+    if (position === 'after') {
+      return {
+        ...textRange,
+        startOffset: textRange.endOffset
+      };
+    }
+  }
+  return target;
+}
+
+async function executeSaveAnnotation(
+  pieceRepo: DexiePieceRepository,
+  annotationRepo: DexieAnnotationRepository,
+  params: {
+    pieceId: string;
+    kind: AnnotationKind;
+    finalTarget: AnnotationTarget | null;
+    content: BreathContent | NoteAnnotationContent;
+    annotationToEdit?: Annotation | null;
+  }
+) {
+  const { pieceId, kind, finalTarget, content, annotationToEdit } = params;
+  if (annotationToEdit) {
+    const updateUseCase = new UpdateAnnotationUseCase(pieceRepo, annotationRepo);
+    await updateUseCase.execute({
+      annotationId: annotationToEdit.id,
+      pieceId,
+      content,
+      ...(finalTarget ? { target: finalTarget } : {})
+    });
+  } else {
+    const createUseCase = new CreateAnnotationUseCase(pieceRepo, annotationRepo);
+    await createUseCase.execute({
+      pieceId,
+      kind,
+      target: finalTarget!,
+      content
+    });
+  }
+}
+
+function getModalHeader(
+  kind: AnnotationKind,
+  isEdit: boolean,
+  t: (key: string) => string
+): { title: string; icon: React.ReactNode } {
+  if (kind === 'breath') {
+    return {
+      title: isEdit ? 'Editar Respiración' : t('addBreath'),
+      icon: <Wind className="h-5 w-5 text-[#188038]" />
+    };
+  }
+  if (kind === 'intent') {
+    return {
+      title: isEdit ? 'Editar Intención' : t('addIntent'),
+      icon: <Lightbulb className="h-5 w-5 text-[#e37400]" />
+    };
+  }
+  return {
+    title: isEdit ? 'Editar Comentario' : t('addComment'),
+    icon: <MessageSquare className="h-5 w-5 text-[#1a73e8]" />
+  };
+}
+
+function useAnnotationFormState(annotationToEdit?: Annotation | null, isOpen?: boolean) {
   const [mark, setMark] = useState<'S' | 'L'>('S');
   const [position, setPosition] = useState<'before' | 'after'>('after');
   const [shortNote, setShortNote] = useState('');
   const [extendedNote, setExtendedNote] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (annotationToEdit) {
@@ -53,21 +120,53 @@ export function AnnotationModal({
     }
   }, [annotationToEdit, isOpen]);
 
-  if (!isOpen || (!target && !annotationToEdit)) return null;
-
-  const getTitleAndIcon = () => {
-    const isEdit = !!annotationToEdit;
-    switch (kind) {
-      case 'breath':
-        return { title: isEdit ? 'Editar Respiración' : t('addBreath'), icon: <Wind className="h-5 w-5 text-[#188038]" /> };
-      case 'intent':
-        return { title: isEdit ? 'Editar Intención' : t('addIntent'), icon: <Lightbulb className="h-5 w-5 text-[#e37400]" /> };
-      case 'comment':
-        return { title: isEdit ? 'Editar Comentario' : t('addComment'), icon: <MessageSquare className="h-5 w-5 text-[#1a73e8]" /> };
-    }
+  const reset = () => {
+    setShortNote('');
+    setExtendedNote('');
+    setMark('S');
+    setPosition('after');
   };
 
-  const { title, icon } = getTitleAndIcon();
+  return {
+    mark,
+    setMark,
+    position,
+    setPosition,
+    shortNote,
+    setShortNote,
+    extendedNote,
+    setExtendedNote,
+    reset
+  };
+}
+
+export function AnnotationModal({
+  isOpen,
+  onClose,
+  pieceId,
+  kind,
+  target,
+  annotationToEdit,
+  onSuccess
+}: Readonly<AnnotationModalProps>) {
+  const { t } = useTranslation();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const {
+    mark,
+    setMark,
+    position,
+    setPosition,
+    shortNote,
+    setShortNote,
+    extendedNote,
+    setExtendedNote,
+    reset
+  } = useAnnotationFormState(annotationToEdit, isOpen);
+
+  if (!isOpen || (!target && !annotationToEdit)) return null;
+
+  const isEdit = Boolean(annotationToEdit);
+  const { title: modalTitle, icon: modalIcon } = getModalHeader(kind, isEdit, t as (k: string) => string);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,22 +182,7 @@ export function AnnotationModal({
       const pieceRepo = new DexiePieceRepository();
       const annotationRepo = new DexieAnnotationRepository();
 
-      let finalTarget = target;
-      if (kind === 'breath' && target && target.kind === 'text-range') {
-        const textRange = target;
-        if (position === 'before') {
-          finalTarget = {
-            ...textRange,
-            endOffset: textRange.startOffset
-          };
-        } else if (position === 'after') {
-          finalTarget = {
-            ...textRange,
-            startOffset: textRange.endOffset
-          };
-        }
-      }
-
+      const finalTarget = computeFinalTarget(target, kind, position);
       const content =
         kind === 'breath'
           ? { mark }
@@ -107,30 +191,16 @@ export function AnnotationModal({
               ...(extendedNote.trim() ? { extendedNote: extendedNote.trim() } : {})
             };
 
-      if (annotationToEdit) {
-        const updateUseCase = new UpdateAnnotationUseCase(pieceRepo, annotationRepo);
-        await updateUseCase.execute({
-          annotationId: annotationToEdit.id,
-          pieceId,
-          content,
-          ...(finalTarget ? { target: finalTarget } : {})
-        });
-        toast.success('Anotación actualizada');
-      } else {
-        const createUseCase = new CreateAnnotationUseCase(pieceRepo, annotationRepo);
-        await createUseCase.execute({
-          pieceId,
-          kind,
-          target: finalTarget!,
-          content
-        });
-        toast.success(t('annotationCreated'));
-      }
+      await executeSaveAnnotation(pieceRepo, annotationRepo, {
+        pieceId,
+        kind,
+        finalTarget,
+        content,
+        annotationToEdit
+      });
 
-      setShortNote('');
-      setExtendedNote('');
-      setMark('S');
-      setPosition('after');
+      toast.success(annotationToEdit ? 'Anotación actualizada' : t('annotationCreated'));
+      reset();
       onSuccess();
       onClose();
     } catch (err) {
@@ -142,19 +212,19 @@ export function AnnotationModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md bg-card text-card-foreground border rounded-xl shadow-lg p-6 flex flex-col gap-5 relative animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Cerrar modal"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm -z-10 animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+      <div className="w-full max-w-md bg-card text-card-foreground border rounded-xl shadow-lg p-6 flex flex-col gap-5 relative animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center gap-2">
-          {icon}
+          {modalIcon}
           <h2 className="text-lg font-semibold tracking-tight text-[#202124]">
-            {title}
+            {modalTitle}
           </h2>
         </div>
 
@@ -163,9 +233,9 @@ export function AnnotationModal({
             /* Breath Mark Selector & Placement */
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#5f6368] uppercase">
+                <span className="text-xs font-semibold text-[#5f6368] uppercase">
                   {t('breathTypeLabel')}
-                </label>
+                </span>
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -195,9 +265,9 @@ export function AnnotationModal({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#5f6368] uppercase">
+                <span className="text-xs font-semibold text-[#5f6368] uppercase">
                   Ubicación de la pausa
-                </label>
+                </span>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -228,10 +298,11 @@ export function AnnotationModal({
             /* Note Annotation Fields */
             <>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#5f6368] uppercase">
+                <label htmlFor="short-note-input" className="text-xs font-semibold text-[#5f6368] uppercase">
                   {t('shortNoteLabel')} *
                 </label>
                 <input
+                  id="short-note-input"
                   type="text"
                   required
                   placeholder={kind === 'intent' ? t('intentPlaceholder') : t('commentPlaceholder')}
@@ -242,10 +313,11 @@ export function AnnotationModal({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#5f6368] uppercase">
+                <label htmlFor="extended-note-input" className="text-xs font-semibold text-[#5f6368] uppercase">
                   {t('extendedNoteLabel')}
                 </label>
                 <textarea
+                  id="extended-note-input"
                   rows={3}
                   placeholder={t('extendedNotePlaceholder')}
                   value={extendedNote}
@@ -279,3 +351,4 @@ export function AnnotationModal({
     </div>
   );
 }
+

@@ -114,7 +114,7 @@ export function WorkListDesktop({
   t,
   uiLanguage,
   setUILanguage
-}: WorkListDesktopProps) {
+}: Readonly<WorkListDesktopProps>) {
   const visibleLimit = 4;
   const visibleTags = availableUserTags.slice(0, visibleLimit);
   const overflowTags = availableUserTags.slice(visibleLimit);
@@ -133,6 +133,7 @@ export function WorkListDesktop({
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-lg border border-[#dadce0] overflow-hidden">
             <button
+              type="button"
               onClick={() => setUILanguage('es')}
               className={`h-[30px] px-[10px] text-xs font-semibold border-0 cursor-pointer ${
                 uiLanguage === 'es' ? 'bg-[#202124] text-white' : 'bg-transparent text-[#5f6368] hover:bg-[#f1f3f4]'
@@ -141,6 +142,7 @@ export function WorkListDesktop({
               ES
             </button>
             <button
+              type="button"
               onClick={() => setUILanguage('en')}
               className={`h-[30px] px-[10px] text-xs font-semibold border-0 cursor-pointer ${
                 uiLanguage === 'en' ? 'bg-[#202124] text-white' : 'bg-transparent text-[#5f6368] hover:bg-[#f1f3f4]'
@@ -181,6 +183,7 @@ export function WorkListDesktop({
           {visiblePieces.length > 0 && (
             <div className="p-3 flex flex-wrap gap-1.5 border-b border-[#e8eaed] shrink-0">
               <button
+                type="button"
                 onClick={clearFilters}
                 className={`px-2.5 py-0.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer ${
                   activeTypeFilters.length === 0 && activeUserFilters.length === 0
@@ -197,6 +200,7 @@ export function WorkListDesktop({
                   : 'bg-[oklch(0.88_0.06_150)] text-[oklch(0.38_0.1_165)] border-[oklch(0.88_0.06_150)]';
                 return (
                   <button
+                    type="button"
                     key={type}
                     onClick={() => toggleTypeFilter(type)}
                     className={`px-2.5 py-0.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer capitalize ${
@@ -211,6 +215,7 @@ export function WorkListDesktop({
                 const isActive = activeUserFilters.includes(tag);
                 return (
                   <button
+                    type="button"
                     key={tag}
                     onClick={() => toggleUserFilter(tag)}
                     className={`px-2.5 py-0.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer ${
@@ -249,6 +254,7 @@ export function WorkListDesktop({
 
                 return (
                   <button
+                    type="button"
                     key={piece.id}
                     onClick={() => setSelectedPieceId(piece.id)}
                     className={`w-full text-left border-0 cursor-pointer p-4 flex gap-3 border-b border-[#e8eaed] transition-colors ${
@@ -300,8 +306,8 @@ export function WorkListDesktop({
                     {currentPiece.title}
                   </h2>
                   <div className="mt-3 flex gap-2 flex-wrap">
-                    {currentPiece.tags?.filter(t => t.kind === 'user').map((t, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1 text-[11px] text-[#80868b]">
+                    {currentPiece.tags?.filter(t => t.kind === 'user').map((t) => (
+                      <span key={t.value} className="inline-flex items-center gap-1 text-[11px] text-[#80868b]">
                         <Tag className="h-2.5 w-2.5" />#{t.value}
                       </span>
                     ))}

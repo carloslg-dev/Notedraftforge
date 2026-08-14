@@ -59,53 +59,68 @@ export function tiptapToDomain(
   };
 }
 
-function tiptapToBlock(node: JSONContent): TextBlock | null {
-  let kind: TextBlock['kind'] = 'paragraph';
-  if (node.type === 'heading') kind = 'heading';
-  else if (node.type === 'blockquote') kind = 'quote';
-  else if (node.type !== 'paragraph') {
-    // Treat other block types as paragraphs for now or just map them to paragraph.
-    // If it's something entirely else we might ignore or adapt.
-    kind = 'paragraph';
-  }
-
-  const runs: TextRun[] = [];
-  if (node.content && Array.isArray(node.content)) {
-    for (const child of node.content) {
-      if (child.type === 'text' && child.text) {
-        const marks: TextMark[] = [];
-        if (child.marks) {
-          for (const m of child.marks) {
-            if (m.type === 'bold' || m.type === 'italic' || m.type === 'underline') {
-              marks.push(m.type as TextMark);
-            }
-          }
-        }
-        runs.push({
-          id: randomUUID(),
-          text: child.text,
-          ...(marks.length > 0 ? { marks } : {}),
-        });
-      } else if (child.type === 'hardBreak') {
-        runs.push({
-          id: randomUUID(),
-          text: '\n',
-        });
+function extractMarks(childMarks: Array<{ type: string }> | undefined): TextMark[] {
+  const marks: TextMark[] = [];
+  if (childMarks) {
+    for (const m of childMarks) {
+      if (m.type === 'bold' || m.type === 'italic' || m.type === 'underline') {
+        marks.push(m.type as TextMark);
       }
     }
   }
+  return marks;
+}
 
-  let blockId = node.attrs?.id;
+function extractRuns(content: JSONContent[] | undefined): TextRun[] {
+  const runs: TextRun[] = [];
+  if (!content || !Array.isArray(content)) {
+    return runs;
+  }
+
+  for (const child of content) {
+    if (child.type === 'text' && child.text) {
+      const marks = extractMarks(child.marks);
+      runs.push({
+        id: randomUUID(),
+        text: child.text,
+        ...(marks.length > 0 ? { marks } : {}),
+      });
+    } else if (child.type === 'hardBreak') {
+      runs.push({
+        id: randomUUID(),
+        text: '\n',
+      });
+    }
+  }
+  return runs;
+}
+
+function resolveBlockId(rawId: unknown): string {
+  let blockId = rawId;
   if (typeof blockId === 'function') {
     blockId = (blockId as () => string)();
   }
   if (!blockId || typeof blockId !== 'string') {
-    blockId = randomUUID();
+    return randomUUID();
+  }
+  return blockId;
+}
+
+function tiptapToBlock(node: JSONContent): TextBlock | null {
+  let kind: TextBlock['kind'] = 'paragraph';
+  if (node.type === 'heading') {
+    kind = 'heading';
+  } else if (node.type === 'blockquote') {
+    kind = 'quote';
   }
 
+  const runs = extractRuns(node.content);
+  const id = resolveBlockId(node.attrs?.id);
+
   return {
-    id: blockId,
+    id,
     kind,
     runs,
   };
 }
+

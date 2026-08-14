@@ -14,7 +14,7 @@ export function CreatePieceModal({
   isOpen,
   onClose,
   onSuccess
-}: CreatePieceModalProps) {
+}: Readonly<CreatePieceModalProps>) {
   const { t, uiLanguage } = useTranslation();
   const [title, setTitle] = useState('');
   const [type, setType] = useState<'text' | 'poem'>('text');
@@ -50,14 +50,14 @@ export function CreatePieceModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md bg-card text-card-foreground border rounded-xl shadow-lg p-6 flex flex-col gap-5 relative animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Cerrar modal"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm -z-10 animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+      <div className="w-full max-w-md bg-card text-card-foreground border rounded-xl shadow-lg p-6 flex flex-col gap-5 relative animate-in zoom-in-95 duration-200">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold tracking-tight text-[#202124]">
             {t('createPieceTitle')}
@@ -67,10 +67,11 @@ export function CreatePieceModal({
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Title Input */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#5f6368] uppercase">
+            <label htmlFor="create-piece-title-input" className="text-xs font-semibold text-[#5f6368] uppercase">
               {t('titleLabel')}
             </label>
             <input
+              id="create-piece-title-input"
               type="text"
               required
               placeholder={t('pieceTitlePlaceholder')}

@@ -14,10 +14,80 @@ export interface FrontmatterMetadata {
   updatedAt?: string;
 }
 
+const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
+const VALID_PIECE_TYPES = new Set<NonNullable<FrontmatterMetadata['type']>>(['text', 'poem', 'song']);
+
+function unquote(val: string): string {
+  if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+    return val.slice(1, -1);
+  }
+  return val;
+}
+
+function parseTags(valStr: string): string[] | undefined {
+  if (!valStr.startsWith('[') || !valStr.endsWith(']')) {
+    return undefined;
+  }
+  return valStr
+    .slice(1, -1)
+    .split(',')
+    .map(t => unquote(t.trim()))
+    .filter(Boolean);
+}
+
+function parseField(key: string, valStr: string, metadata: FrontmatterMetadata): void {
+  const value = unquote(valStr);
+
+  switch (key) {
+    case 'id':
+      metadata.id = value;
+      break;
+    case 'title':
+      metadata.title = value;
+      break;
+    case 'type':
+      if (VALID_PIECE_TYPES.has(value as NonNullable<FrontmatterMetadata['type']>)) {
+        metadata.type = value as NonNullable<FrontmatterMetadata['type']>;
+      }
+      break;
+    case 'language':
+      metadata.language = value;
+      break;
+    case 'revision':
+      metadata.revision = Number.parseInt(value, 10) || 0;
+      break;
+    case 'createdAt':
+      metadata.createdAt = value;
+      break;
+    case 'updatedAt':
+      metadata.updatedAt = value;
+      break;
+    case 'tags': {
+      const tags = parseTags(valStr);
+      if (tags) {
+        metadata.tags = tags;
+      }
+      break;
+    }
+  }
+}
+
+function parseLine(line: string, metadata: FrontmatterMetadata): void {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return;
+
+  const colonIdx = trimmed.indexOf(':');
+  if (colonIdx === -1) return;
+
+  const key = trimmed.slice(0, colonIdx).trim();
+  const valStr = trimmed.slice(colonIdx + 1).trim();
+
+  parseField(key, valStr, metadata);
+}
+
 export function parseYamlFrontmatter(rawContent: string): { metadata: FrontmatterMetadata; body: string } {
   const normalized = rawContent.replace(/\r\n/g, '\n');
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-  const match = normalized.match(frontmatterRegex);
+  const match = FRONTMATTER_REGEX.exec(normalized);
 
   if (!match) {
     return { metadata: {}, body: normalized };
@@ -29,54 +99,13 @@ export function parseYamlFrontmatter(rawContent: string): { metadata: Frontmatte
 
   const lines = yamlBlock.split('\n');
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    const colonIdx = trimmed.indexOf(':');
-    if (colonIdx === -1) continue;
-
-    const key = trimmed.slice(0, colonIdx).trim();
-    let valStr = trimmed.slice(colonIdx + 1).trim();
-
-    if ((valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))) {
-      valStr = valStr.slice(1, -1);
-    }
-
-    if (key === 'id') metadata.id = valStr;
-    else if (key === 'title') metadata.title = valStr;
-    else if (key === 'type' && (valStr === 'text' || valStr === 'poem' || valStr === 'song')) metadata.type = valStr;
-    else if (key === 'language') metadata.language = valStr;
-    else if (key === 'revision') metadata.revision = parseInt(valStr, 10) || 0;
-    else if (key === 'createdAt') metadata.createdAt = valStr;
-    else if (key === 'updatedAt') metadata.updatedAt = valStr;
-    else if (key === 'tags') {
-      if (valStr.startsWith('[') && valStr.endsWith(']')) {
-        const rawTags = valStr
-          .slice(1, -1)
-          .split(',')
-          .map(t => t.trim().replace(/^["']|["']$/g, ''))
-          .filter(Boolean);
-        metadata.tags = rawTags;
-      }
-    }
+    parseLine(line, metadata);
   }
 
   return { metadata, body };
 }
 
-export function parseYamlMarkdownToPiece(rawContent: string, fallbackTitle = 'Untitled Work'): Piece {
-  const { metadata, body } = parseYamlFrontmatter(rawContent);
-  const parser = new MarkedParserAdapter();
-  const blocks = parser.parse(body);
-
-  const pieceType = metadata.type || 'poem';
-  const title = metadata.title || fallbackTitle;
-  const piece = createPiece({
-    title,
-    type: pieceType,
-    language: metadata.language || 'es'
-  });
-
+function applyMetadataToPiece(piece: Piece, metadata: FrontmatterMetadata, pieceType: 'text' | 'poem' | 'song'): void {
   if (metadata.id) {
     piece.id = metadata.id;
   }
@@ -95,6 +124,22 @@ export function parseYamlMarkdownToPiece(rawContent: string, fallbackTitle = 'Un
     const typeTag: TagRef = { kind: 'type', value: pieceType };
     piece.tags = [typeTag, ...userTags];
   }
+}
+
+export function parseYamlMarkdownToPiece(rawContent: string, fallbackTitle = 'Untitled Work'): Piece {
+  const { metadata, body } = parseYamlFrontmatter(rawContent);
+  const parser = new MarkedParserAdapter();
+  const blocks = parser.parse(body);
+
+  const pieceType = metadata.type || 'poem';
+  const title = metadata.title || fallbackTitle;
+  const piece = createPiece({
+    title,
+    type: pieceType,
+    language: metadata.language || 'es'
+  });
+
+  applyMetadataToPiece(piece, metadata, pieceType);
 
   if (pieceType === 'text' || pieceType === 'poem') {
     piece.content = {
@@ -111,14 +156,17 @@ export function serializePieceToYamlMarkdown(piece: Piece): string {
     .filter((t: TagRef) => t.kind === 'user')
     .map((t: TagRef) => t.value);
 
+  const escapedTitle = piece.title.replace(/"/g, String.raw`\"`);
+  const formattedTags = userTags.map((t: string) => JSON.stringify(t)).join(', ');
+
   const frontmatterLines = [
     '---',
     `id: "${piece.id}"`,
-    `title: "${piece.title.replace(/"/g, '\\"')}"`,
+    `title: "${escapedTitle}"`,
     `type: "${piece.type}"`,
     `language: "${piece.language}"`,
     `revision: ${piece.revision}`,
-    `tags: [${userTags.map((t: string) => `"${t}"`).join(', ')}]`,
+    `tags: [${formattedTags}]`,
     `createdAt: "${piece.createdAt}"`,
     `updatedAt: "${piece.updatedAt}"`,
     '---',

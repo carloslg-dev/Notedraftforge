@@ -13,7 +13,7 @@ interface TiptapEditorProps {
   onUpdate: (content: PieceContent) => void;
 }
 
-export function TiptapEditor({ initialContent, onUpdate }: TiptapEditorProps) {
+export function TiptapEditor({ initialContent, onUpdate }: Readonly<TiptapEditorProps>) {
   const originalKind = initialContent.kind === 'song' ? 'text' : initialContent.kind;
 
   const editor = useEditor({

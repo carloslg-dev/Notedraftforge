@@ -15,7 +15,8 @@ export class ZodBackupValidator implements BackupValidatorPort {
     if (!result.success) {
       const formattedErrors = result.error.issues.map(err => {
         const path = err.path.join('.');
-        return `${path ? `[${path}] ` : ''}${err.message}`;
+        const prefix = path ? `[${path}] ` : '';
+        return `${prefix}${err.message}`;
       }).join('; ');
       
       throw new Error(`Backup schema validation failed: ${formattedErrors}`);

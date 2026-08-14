@@ -12,7 +12,7 @@ export const BlockIdExtension = Extension.create({
           id: {
             default: () => randomUUID(),
             keepOnSplit: false,
-            parseHTML: element => element.getAttribute('data-id'),
+            parseHTML: element => element.dataset.id,
             renderHTML: attributes => {
               if (!attributes.id) {
                 return {};

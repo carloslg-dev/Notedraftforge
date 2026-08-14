@@ -26,6 +26,18 @@ export function deriveChordDisplay(chord: { root: MusicalRoot; modifiers: Musica
   return display;
 }
 
+const ALLOWED_MODS = new Set<string>(['sharp', 'flat', 'minor', 'major', 'seventh']);
+
+function parseRootAlteration(accidental: string | undefined): MusicalModifier | null {
+  if (!accidental) {
+    return null;
+  }
+  if (accidental === '#' || accidental === '♯') {
+    return 'sharp';
+  }
+  return 'flat';
+}
+
 export function createChord(root: string, modifiers: string[] = []): ChordContent {
   const rootRegex = /^[A-G]([♭♯#b])?$/;
   if (!rootRegex.test(root)) {
@@ -34,9 +46,7 @@ export function createChord(root: string, modifiers: string[] = []): ChordConten
 
   const baseNote = root[0] as MusicalRoot;
   const accidental = root[1];
-  const rootAlteration: MusicalModifier | null = accidental
-    ? (accidental === '#' || accidental === '♯' ? 'sharp' : 'flat')
-    : null;
+  const rootAlteration: MusicalModifier | null = parseRootAlteration(accidental);
 
   const inputAlterations = modifiers.filter(m => m === 'sharp' || m === 'flat') as MusicalModifier[];
   const allAlterations: MusicalModifier[] = [];
@@ -59,8 +69,7 @@ export function createChord(root: string, modifiers: string[] = []): ChordConten
     throw new Error('A chord cannot have multiple identical extensions.');
   }
 
-  const allowedMods = ['sharp', 'flat', 'minor', 'major', 'seventh'];
-  const invalidMods = modifiers.filter(m => !allowedMods.includes(m));
+  const invalidMods = modifiers.filter(m => !ALLOWED_MODS.has(m));
   if (invalidMods.length > 0) {
     throw new Error(`Invalid modifiers found: ${invalidMods.join(', ')}`);
   }

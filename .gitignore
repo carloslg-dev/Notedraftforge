@@ -4,3 +4,7 @@
 node_modules/
 dist/
 .ai/
+.scannerwork/
+*.tmp
+sonar_issues.json
+all_issues_formatted.txt

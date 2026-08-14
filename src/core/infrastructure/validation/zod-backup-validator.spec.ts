@@ -73,9 +73,9 @@ describe('ZodBackupValidator', () => {
     const json = JSON.stringify(validBackupObj);
     const result = validator.validate(json);
     expect(result.version).toBe('1');
-    expect(result.pieces.length).toBe(1);
+    expect(result.pieces).toHaveLength(1);
     expect(result.pieces[0].title).toBe('My Song Draft');
-    expect(result.pieces[0].annotations.length).toBe(1);
+    expect(result.pieces[0].annotations).toHaveLength(1);
   });
 
   it('rejects malformed JSON', () => {

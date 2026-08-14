@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('Uncaught error:', error, errorInfo);
   }
 
-  private handleReload = () => {
+  private readonly handleReload = () => {
     window.location.reload();
   };
 

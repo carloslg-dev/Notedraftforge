@@ -63,11 +63,20 @@ export class FileSystemPieceRepository implements PieceRepository {
   }
 
   private slugify(text: string): string {
-    return text
+    const slug = text
       .toLowerCase()
       .trim()
       .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'piece';
+      .replace(/[\s_]+/g, '-');
+    let start = 0;
+    while (start < slug.length && slug[start] === '-') {
+      start++;
+    }
+    let end = slug.length;
+    while (end > start && slug[end - 1] === '-') {
+      end--;
+    }
+    const trimmed = slug.slice(start, end);
+    return trimmed.length > 0 ? trimmed : 'piece';
   }
 }

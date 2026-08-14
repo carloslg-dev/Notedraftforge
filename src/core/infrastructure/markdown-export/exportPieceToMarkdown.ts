@@ -17,15 +17,17 @@ export function exportPieceToMarkdown(piece: Piece, options?: { includeFrontmatt
     const userTags = piece.tags
       .filter((t: TagRef) => t.kind === 'user')
       .map((t: TagRef) => t.value);
+    const formattedTags = userTags.map(t => JSON.stringify(t)).join(', ');
+    const escapedTitle = piece.title.replace(/"/g, String.raw`\"`);
 
     const frontmatterLines = [
       '---',
       `id: "${piece.id}"`,
-      `title: "${piece.title.replace(/"/g, '\\"')}"`,
+      `title: "${escapedTitle}"`,
       `type: "${piece.type}"`,
       `language: "${piece.language}"`,
       `revision: ${piece.revision}`,
-      `tags: [${userTags.map((t: string) => `"${t}"`).join(', ')}]`,
+      `tags: [${formattedTags}]`,
       `createdAt: "${piece.createdAt}"`,
       `updatedAt: "${piece.updatedAt}"`,
       '---',

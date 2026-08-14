@@ -17,7 +17,7 @@ export function TagSearchOverlay({
   activeTags,
   onSelectTag,
   isDesktop
-}: TagSearchOverlayProps) {
+}: Readonly<TagSearchOverlayProps>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -28,7 +28,7 @@ export function TagSearchOverlay({
     return activeTags.find(tag => availableTags.includes(tag));
   }, [activeTags, availableTags]);
 
-  const triggerLabel = activeOverflowTag ? activeOverflowTag : '···';
+  const triggerLabel = activeOverflowTag ?? '···';
   const triggerVariant = activeOverflowTag ? 'default' : 'outline';
 
   const filteredTags = useMemo(() => {
@@ -51,7 +51,7 @@ export function TagSearchOverlay({
   };
 
   const TriggerButton = (
-    <Badge role="button"
+    <Badge
       variant={triggerVariant}
       className="cursor-pointer hover:bg-primary/80"
     >
@@ -60,7 +60,7 @@ export function TagSearchOverlay({
   );
 
   const Content = (
-    <div className="flex flex-col gap-4 py-4 md:py-0 w-full h-full" role="dialog" aria-label="Tag Search Overlay">
+    <div className="flex flex-col gap-4 py-4 md:py-0 w-full h-full" aria-label="Tag Search Overlay">
       <Input
         placeholder={t('searchPlaceholder')}
         value={query}

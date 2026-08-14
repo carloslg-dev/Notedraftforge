@@ -50,7 +50,7 @@ export function WorkListMobile({
   t,
   uiLanguage,
   setUILanguage
-}: WorkListMobileProps) {
+}: Readonly<WorkListMobileProps>) {
   const visibleLimit = 2;
   const visibleTags = availableUserTags.slice(0, visibleLimit);
   const overflowTags = availableUserTags.slice(visibleLimit);
@@ -66,6 +66,7 @@ export function WorkListMobile({
           {/* Active Language toggle for mobile */}
           <div className="inline-flex rounded-lg border border-[#dadce0] overflow-hidden mr-1">
             <button
+              type="button"
               onClick={() => setUILanguage('es')}
               className={`h-[26px] px-2 text-[10px] font-bold border-0 cursor-pointer ${
                 uiLanguage === 'es' ? 'bg-[#202124] text-white' : 'bg-transparent text-[#5f6368]'
@@ -74,6 +75,7 @@ export function WorkListMobile({
               ES
             </button>
             <button
+              type="button"
               onClick={() => setUILanguage('en')}
               className={`h-[26px] px-2 text-[10px] font-bold border-0 cursor-pointer ${
                 uiLanguage === 'en' ? 'bg-[#202124] text-white' : 'bg-transparent text-[#5f6368]'
@@ -98,6 +100,7 @@ export function WorkListMobile({
       {visiblePieces.length > 0 && (
         <div className="px-4 py-2.5 flex gap-1.5 overflow-x-auto bg-white border-b border-[#e8eaed] shrink-0 scrollbar-none">
           <button
+            type="button"
             onClick={clearFilters}
             className={`px-3 py-0.5 rounded-full border text-[11px] font-medium shrink-0 cursor-pointer ${
               activeTypeFilters.length === 0 && activeUserFilters.length === 0
@@ -114,6 +117,7 @@ export function WorkListMobile({
               : 'bg-[oklch(0.88_0.06_150)] text-[oklch(0.38_0.1_165)] border-[oklch(0.88_0.06_150)]';
             return (
               <button
+                type="button"
                 key={type}
                 onClick={() => toggleTypeFilter(type)}
                 className={`px-3 py-0.5 rounded-full border text-[11px] font-medium shrink-0 cursor-pointer capitalize ${
@@ -128,6 +132,7 @@ export function WorkListMobile({
             const isActive = activeUserFilters.includes(tag);
             return (
               <button
+                type="button"
                 key={tag}
                 onClick={() => toggleUserFilter(tag)}
                 className={`px-3 py-0.5 rounded-full border text-[11px] font-medium shrink-0 cursor-pointer ${
@@ -196,6 +201,7 @@ export function WorkListMobile({
       {/* Floating Action Button (FAB) for New Work */}
       <div className="fixed right-4 bottom-5 z-40">
         <button
+          type="button"
           onClick={handleNewWorkClick}
           className="bg-[#1a73e8] hover:bg-[#1557b0] text-white shadow-lg h-12 px-5 rounded-full flex items-center gap-2 font-semibold text-sm active:scale-95 transition-transform"
         >

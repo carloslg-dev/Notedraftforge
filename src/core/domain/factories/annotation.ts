@@ -35,7 +35,7 @@ function validateAnnotationContent(kind: AnnotationKind, content: AnnotationCont
     if (!noteContent.shortNote || noteContent.shortNote.trim() === '') {
       throw new Error("shortNote must be a non-empty string");
     }
-    if (noteContent.extendedNote !== undefined && noteContent.extendedNote.trim() === '') {
+    if (noteContent.extendedNote?.trim() === '') {
       throw new Error("extendedNote must be a non-empty string when present");
     }
     const sanitized: NoteAnnotationContent = {

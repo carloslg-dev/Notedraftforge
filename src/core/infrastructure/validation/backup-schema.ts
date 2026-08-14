@@ -198,6 +198,92 @@ export const pieceSchema = z.object({
   }
 });
 
+function validateTextTarget(
+  target: { blockId?: string },
+  content: { kind: string; blocks?: { id: string }[] },
+  index: number,
+  ctx: z.RefinementCtx
+) {
+  if (content.kind === 'song' || !content.blocks) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Text target used on song piece',
+      path: ['annotations', index, 'target']
+    });
+    return;
+  }
+  const blockId = target.blockId;
+  const blockExists = content.blocks.some(b => b.id === blockId);
+  if (!blockExists) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Target blockId '${blockId}' not found in piece content`,
+      path: ['annotations', index, 'target', 'blockId']
+    });
+  }
+}
+
+function validateSongCellTarget(
+  target: { sectionId: string; cellId?: string; startCellId?: string; endCellId?: string; kind: string },
+  section: { cells: { id: string }[] },
+  index: number,
+  ctx: z.RefinementCtx
+) {
+  if (target.kind === 'song-cell') {
+    const cellExists = section.cells.some(c => c.id === target.cellId);
+    if (!cellExists) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Target cellId '${target.cellId}' not found in section '${target.sectionId}'`,
+        path: ['annotations', index, 'target', 'cellId']
+      });
+    }
+  } else {
+    const startExists = section.cells.some(c => c.id === target.startCellId);
+    const endExists = section.cells.some(c => c.id === target.endCellId);
+    if (!startExists) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Target startCellId '${target.startCellId}' not found in section '${target.sectionId}'`,
+        path: ['annotations', index, 'target', 'startCellId']
+      });
+    }
+    if (!endExists) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Target endCellId '${target.endCellId}' not found in section '${target.sectionId}'`,
+        path: ['annotations', index, 'target', 'endCellId']
+      });
+    }
+  }
+}
+
+function validateSongTarget(
+  target: { sectionId: string; cellId?: string; startCellId?: string; endCellId?: string; kind: string },
+  content: { kind: string; sections?: { id: string; cells: { id: string }[] }[] },
+  index: number,
+  ctx: z.RefinementCtx
+) {
+  if (content.kind !== 'song' || !content.sections) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Song target used on non-song piece',
+      path: ['annotations', index, 'target']
+    });
+    return;
+  }
+  const section = content.sections.find(s => s.id === target.sectionId);
+  if (!section) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Target sectionId '${target.sectionId}' not found in song content`,
+      path: ['annotations', index, 'target', 'sectionId']
+    });
+    return;
+  }
+  validateSongCellTarget(target, section, index, ctx);
+}
+
 export const backupPieceSchema = pieceSchema.extend({
   annotations: z.array(annotationSchema),
   layerVisibility: z.record(z.enum(['chord', 'meter', 'breath', 'intention', 'comments']), z.boolean())
@@ -212,72 +298,9 @@ export const backupPieceSchema = pieceSchema.extend({
     }
 
     if (ann.target.kind === 'text-range' || ann.target.kind === 'text-node') {
-      if (data.content.kind === 'song') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Text target used on song piece',
-          path: ['annotations', index, 'target']
-        });
-      } else {
-        const target = ann.target as { blockId?: string };
-        const blockId = target.blockId;
-        const blockExists = data.content.blocks.some(b => b.id === blockId);
-        if (!blockExists) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `Target blockId '${blockId}' not found in piece content`,
-            path: ['annotations', index, 'target', 'blockId']
-          });
-        }
-      }
+      validateTextTarget(ann.target as { blockId?: string }, data.content, index, ctx);
     } else if (ann.target.kind === 'song-cell' || ann.target.kind === 'song-cell-range') {
-      if (data.content.kind !== 'song') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Song target used on non-song piece',
-          path: ['annotations', index, 'target']
-        });
-      } else {
-        const sectionId = ann.target.sectionId;
-        const section = data.content.sections.find(s => s.id === sectionId);
-        if (!section) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `Target sectionId '${sectionId}' not found in song content`,
-            path: ['annotations', index, 'target', 'sectionId']
-          });
-        } else {
-          if (ann.target.kind === 'song-cell') {
-            const target = ann.target as { cellId?: string };
-            const cellExists = section.cells.some(c => c.id === target.cellId);
-            if (!cellExists) {
-              ctx.addIssue({
-                code: 'custom',
-                message: `Target cellId '${target.cellId}' not found in section '${sectionId}'`,
-                path: ['annotations', index, 'target', 'cellId']
-              });
-            }
-          } else {
-            const target = ann.target as { startCellId?: string; endCellId?: string };
-            const startExists = section.cells.some(c => c.id === target.startCellId);
-            const endExists = section.cells.some(c => c.id === target.endCellId);
-            if (!startExists) {
-              ctx.addIssue({
-                code: 'custom',
-                message: `Target startCellId '${target.startCellId}' not found in section '${sectionId}'`,
-                path: ['annotations', index, 'target', 'startCellId']
-              });
-            }
-            if (!endExists) {
-              ctx.addIssue({
-                code: 'custom',
-                message: `Target endCellId '${target.endCellId}' not found in section '${sectionId}'`,
-                path: ['annotations', index, 'target', 'endCellId']
-              });
-            }
-          }
-        }
-      }
+      validateSongTarget(ann.target as { sectionId: string; kind: string }, data.content, index, ctx);
     }
   });
 });

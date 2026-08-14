@@ -54,7 +54,7 @@ export interface SongCell {
   id: string;
   text: string;
   chord?: ChordContent; // owned by the SongCell, not by Annotation
-  meter?: MeterContent; // owned by the SongCell, not by Annotation
+  meter?: string;       // owned by the SongCell, not by Annotation, e.g. "4/4", "3/4"
 }
 
 export interface ChordContent {
@@ -70,9 +70,6 @@ export type MusicalRoot = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 // mode: minor | major (mutually exclusive)
 // extension: seventh
 export type MusicalModifier = 'sharp' | 'flat' | 'minor' | 'major' | 'seventh';
-
-// meter — free text, e.g. "4/4", "3/4", "2/4"
-export type MeterContent = string;
 
 export interface TagRef {
   kind: TagKind;

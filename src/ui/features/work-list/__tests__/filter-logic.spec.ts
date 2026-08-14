@@ -24,7 +24,7 @@ describe('Work List Filtering Logic', () => {
 
   it('filters out song pieces', () => {
     const visible = computeVisiblePieces(pieces);
-    expect(visible.length).toBe(3);
+    expect(visible).toHaveLength(3);
     expect(visible.find(p => p.id === '3')).toBeUndefined();
   });
 
@@ -37,24 +37,24 @@ describe('Work List Filtering Logic', () => {
   it('filters by type OR logic', () => {
     const visible = computeVisiblePieces(pieces);
     const textOnly = computeFilteredPieces(visible, ['text'], []);
-    expect(textOnly.length).toBe(2);
+    expect(textOnly).toHaveLength(2);
     expect(textOnly.every(p => p.tags!.find(t => t.kind === 'type')?.value === 'text')).toBe(true);
   });
 
   it('filters by user tags AND logic (case insensitive)', () => {
     const visible = computeVisiblePieces(pieces);
     const draftOnly = computeFilteredPieces(visible, [], ['draft']); // lower case filter, mixed case tag
-    expect(draftOnly.length).toBe(1);
+    expect(draftOnly).toHaveLength(1);
     expect(draftOnly[0].id).toBe('1');
   });
 
   it('combines type and user filters', () => {
     const visible = computeVisiblePieces(pieces);
     const result = computeFilteredPieces(visible, ['poem'], ['love']);
-    expect(result.length).toBe(1);
+    expect(result).toHaveLength(1);
     expect(result[0].id).toBe('2');
 
     const resultEmpty = computeFilteredPieces(visible, ['text'], ['love']);
-    expect(resultEmpty.length).toBe(0);
+    expect(resultEmpty).toHaveLength(0);
   });
 });

@@ -60,10 +60,6 @@
 
 /* ─── NoteDraftForge layer visibility CSS contract ─── */
 
-/* Annotation elements */
-.ndf-annotation { }
-.ndf-needs-review { }
-
 /* Hide layer by container class — zero JS re-render on toggle */
 .ndf-hide-breath    .ndf-layer-breath    { display: none; }
 .ndf-hide-intention .ndf-layer-intention { display: none; }

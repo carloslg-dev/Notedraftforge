@@ -44,8 +44,8 @@ test.describe('Piece Lifecycle E2E', () => {
     await editor.click();
     await page.keyboard.type('Hello, this is persistent E2E text!');
 
-    // Wait 1.5 seconds to trigger the 800ms debounce autosave and let state refresh
-    await page.waitForTimeout(1500);
+    // Wait for text to be typed and present in editor
+    await expect(editor).toContainText('Hello, this is persistent E2E text!');
 
     // Click "Finish Editing" or "Terminar Edición" to switch back to visualization mode
     const finishBtn = page.locator('button:has-text("Terminar Edición"), button:has-text("Finish Editing")').first();
@@ -184,8 +184,8 @@ test.describe('Piece Lifecycle E2E', () => {
     await editor.click();
     await page.keyboard.type('Hello Mobile selection toolbar!');
 
-    // Wait 1.5 seconds to trigger autosave
-    await page.waitForTimeout(1500);
+    // Wait for text to be typed and present in editor
+    await expect(editor).toContainText('Hello Mobile selection toolbar!');
 
     // Select text in editor to trigger formatting BubbleMenu via programmatic selection
     await page.evaluate(() => {
