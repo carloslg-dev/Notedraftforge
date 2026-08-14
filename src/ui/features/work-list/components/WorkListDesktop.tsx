@@ -11,7 +11,8 @@ import {
   FileText,
   Eye,
   Edit,
-  Tag
+  Tag,
+  Layers
 } from 'lucide-react';
 import type { Piece, PieceContent } from '@/core/domain/types/';
 import { toast } from 'sonner';
@@ -33,6 +34,7 @@ interface WorkListDesktopProps {
   exportBackup: () => void;
   setIsRestoreModalOpen: (open: boolean) => void;
   handleNewWorkClick: () => void;
+  handleOpenWorkspaces?: () => void;
   handleEditClick: (pieceId: string) => void;
   isDesktop: boolean;
   t: (key: TranslationKey) => string;
@@ -109,6 +111,7 @@ export function WorkListDesktop({
   exportBackup,
   setIsRestoreModalOpen,
   handleNewWorkClick,
+  handleOpenWorkspaces,
   handleEditClick,
   isDesktop,
   t,
@@ -167,6 +170,11 @@ export function WorkListDesktop({
               <Button variant="ghost" size="icon" className="h-8 w-8 text-[#5f6368]" onClick={() => toast.info(t('search'))}>
                 <Search className="h-4 w-4" />
               </Button>
+              {handleOpenWorkspaces && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-[#5f6368]" onClick={handleOpenWorkspaces} title={t('workspaces')}>
+                  <Layers className="h-4 w-4" />
+                </Button>
+              )}
               <Button variant="ghost" size="icon" className="h-8 w-8 text-[#5f6368]" onClick={handleNewWorkClick} title={t('newWork')}>
                 <Plus className="h-4 w-4" />
               </Button>

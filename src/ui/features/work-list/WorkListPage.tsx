@@ -13,15 +13,20 @@ import { useUIStore } from '@/ui/state/ui-store';
 import { useTranslation } from '@/ui/hooks/use-translation';
 
 
+import { useWorkspaces } from '@/ui/features/workspace/use-workspaces';
+import { CreateWorkspaceModal } from '@/ui/features/workspace/components/CreateWorkspaceModal';
+
 export function WorkListPage() {
   const navigate = useNavigate();
   const { handleError } = useAppError();
   const { pieces, loading, error, refresh } = useWorkList();
+  const { workspaces } = useWorkspaces();
   const { exportBackup, isExporting } = useExportBackup();
   const { enterEditing } = useUIStore();
   const { t, uiLanguage, setUILanguage } = useTranslation();
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
 
   const [activeTypeFilters, setActiveTypeFilters] = useState<string[]>([]);
@@ -75,6 +80,14 @@ export function WorkListPage() {
     setIsCreateModalOpen(true);
   };
 
+  const handleOpenWorkspaces = () => {
+    if (workspaces.length > 0) {
+      navigate(`/workspace/${workspaces[0].id}`);
+    } else {
+      setIsCreateWorkspaceModalOpen(true);
+    }
+  };
+
   const handleCreateSuccess = (pieceId: string) => {
     refresh();
     setSelectedPieceId(pieceId);
@@ -117,6 +130,7 @@ export function WorkListPage() {
           exportBackup={exportBackup}
           setIsRestoreModalOpen={setIsRestoreModalOpen}
           handleNewWorkClick={handleNewWorkClick}
+          handleOpenWorkspaces={handleOpenWorkspaces}
           handleEditClick={handleEditClick}
           isDesktop={isDesktop}
           t={t}
@@ -137,6 +151,7 @@ export function WorkListPage() {
           exportBackup={exportBackup}
           setIsRestoreModalOpen={setIsRestoreModalOpen}
           handleNewWorkClick={handleNewWorkClick}
+          handleOpenWorkspaces={handleOpenWorkspaces}
           isDesktop={isDesktop}
           t={t}
           uiLanguage={uiLanguage}
@@ -154,6 +169,12 @@ export function WorkListPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
+      />
+
+      <CreateWorkspaceModal
+        isOpen={isCreateWorkspaceModalOpen}
+        onClose={() => setIsCreateWorkspaceModalOpen(false)}
+        onSuccess={(flowId) => navigate(`/workspace/${flowId}`)}
       />
     </>
   );

@@ -8,7 +8,8 @@ import {
   ChevronRight,
   Feather,
   FileText,
-  Settings
+  Settings,
+  Layers
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Piece } from '@/core/domain/types/';
@@ -27,6 +28,7 @@ interface WorkListMobileProps {
   exportBackup: () => void;
   setIsRestoreModalOpen: (open: boolean) => void;
   handleNewWorkClick: () => void;
+  handleOpenWorkspaces?: () => void;
   isDesktop: boolean;
   t: (key: TranslationKey) => string;
   uiLanguage: 'es' | 'en';
@@ -46,6 +48,7 @@ export function WorkListMobile({
   exportBackup,
   setIsRestoreModalOpen,
   handleNewWorkClick,
+  handleOpenWorkspaces,
   isDesktop,
   t,
   uiLanguage,
@@ -84,6 +87,11 @@ export function WorkListMobile({
               EN
             </button>
           </div>
+          {handleOpenWorkspaces && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-[#5f6368]" onClick={handleOpenWorkspaces} title={t('workspaces')}>
+              <Layers className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-8 w-8 text-[#5f6368]" onClick={() => setIsRestoreModalOpen(true)} title={t('restoreBackup')}>
             <Upload className="h-4 w-4" />
           </Button>
