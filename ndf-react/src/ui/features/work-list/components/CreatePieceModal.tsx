@@ -114,10 +114,11 @@ export function CreatePieceModal({
 
           {/* Language Input */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#5f6368] uppercase">
+            <label htmlFor="create-piece-language-input" className="text-xs font-semibold text-[#5f6368] uppercase">
               {t('languageLabel')}
             </label>
             <input
+              id="create-piece-language-input"
               type="text"
               required
               maxLength={2}

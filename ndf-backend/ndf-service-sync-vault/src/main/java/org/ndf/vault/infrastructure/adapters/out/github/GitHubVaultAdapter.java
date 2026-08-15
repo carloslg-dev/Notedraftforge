@@ -17,6 +17,11 @@ import java.util.Objects;
 @ApplicationScoped
 public class GitHubVaultAdapter implements GitHubSyncPort {
 
+    private static final String AUTH_BEARER_PREFIX = "Bearer ";
+    private static final String HEADER_ACCEPT_GITHUB = "application/vnd.github+json";
+    private static final String DEFAULT_COMMIT_MESSAGE = "chore: sync sovereign vault from NoteDraftForge";
+    private static final String DEFAULT_BRANCH = "main";
+
     private final GitHubRestClient restClient;
 
     @Inject
@@ -33,8 +38,8 @@ public class GitHubVaultAdapter implements GitHubSyncPort {
         String commitMessage,
         Map<String, String> filesPathToContent
     ) {
-        String authHeader = "Bearer " + token;
-        String acceptHeader = "application/vnd.github+json";
+        String authHeader = AUTH_BEARER_PREFIX + token;
+        String acceptHeader = HEADER_ACCEPT_GITHUB;
         String lastCommitSha = "";
         String lastCommitUrl = "";
         int filesCount = 0;
@@ -45,9 +50,9 @@ public class GitHubVaultAdapter implements GitHubSyncPort {
             String base64Content = Base64.getEncoder().encodeToString(rawContent.getBytes(StandardCharsets.UTF_8));
 
             CreateOrUpdateFileRequest req = new CreateOrUpdateFileRequest(
-                commitMessage != null ? commitMessage : "chore: sync sovereign vault from NoteDraftForge",
+                commitMessage != null ? commitMessage : DEFAULT_COMMIT_MESSAGE,
                 base64Content,
-                branch != null ? branch : "main",
+                branch != null ? branch : DEFAULT_BRANCH,
                 null
             );
 
@@ -58,7 +63,7 @@ public class GitHubVaultAdapter implements GitHubSyncPort {
                     lastCommitUrl = response.commit().html_url();
                     filesCount++;
                 }
-            } catch (Exception e) {
+            } catch (Exception _) {
                 // If remote call fails in test or disconnected environment, generate local fallback confirmation
                 lastCommitSha = "git-local-sha-" + System.currentTimeMillis();
                 lastCommitUrl = "https://github.com/" + repoOwner + "/" + repoName + "/commit/" + lastCommitSha;
