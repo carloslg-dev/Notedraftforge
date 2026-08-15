@@ -14,6 +14,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PublicShowcaseServiceTest {
 
+    private static final String PIECE_100 = "piece-100";
+    private static final String PIECE_TITLE = "Cántico Espiritual";
+    private static final String PIECE_MISSING = "piece-missing";
+    private static final String TYPE_POEM = "poem";
+    private static final String WORKSPACE_LIVE = "workspace-live";
+
     private InMemoryShowcaseAdapter storagePort;
     private PublicShowcaseService service;
 
@@ -27,24 +33,24 @@ class PublicShowcaseServiceTest {
     @DisplayName("Should return saved public piece when present in storage")
     void shouldReturnStoredPublicPiece() {
         PublicPieceDTO piece = new PublicPieceDTO();
-        piece.setId("piece-100");
-        piece.setTitle("Cántico Espiritual");
-        piece.setType("poem");
+        piece.setId(PIECE_100);
+        piece.setTitle(PIECE_TITLE);
+        piece.setType(TYPE_POEM);
         storagePort.savePiece(piece);
 
-        PublicPieceDTO result = service.getPublicPiece("piece-100");
+        PublicPieceDTO result = service.getPublicPiece(PIECE_100);
 
-        assertThat(result.getId()).isEqualTo("piece-100");
-        assertThat(result.getTitle()).isEqualTo("Cántico Espiritual");
+        assertThat(result.getId()).isEqualTo(PIECE_100);
+        assertThat(result.getTitle()).isEqualTo(PIECE_TITLE);
     }
 
     @Test
     @DisplayName("Should return fallback public piece when not found in storage")
     void shouldReturnFallbackPublicPiece() {
-        PublicPieceDTO result = service.getPublicPiece("piece-missing");
+        PublicPieceDTO result = service.getPublicPiece(PIECE_MISSING);
 
-        assertThat(result.getId()).isEqualTo("piece-missing");
-        assertThat(result.getTitle()).contains("piece-missing");
+        assertThat(result.getId()).isEqualTo(PIECE_MISSING);
+        assertThat(result.getTitle()).contains(PIECE_MISSING);
     }
 
     @Test
@@ -52,7 +58,7 @@ class PublicShowcaseServiceTest {
     void shouldListPublicPieces() {
         PublicPieceDTO piece1 = new PublicPieceDTO();
         piece1.setId("p1");
-        piece1.setType("poem");
+        piece1.setType(TYPE_POEM);
         storagePort.savePiece(piece1);
 
         PublicPieceDTO piece2 = new PublicPieceDTO();
@@ -60,18 +66,28 @@ class PublicShowcaseServiceTest {
         piece2.setType("song");
         storagePort.savePiece(piece2);
 
-        PublicPiecePageDTO poems = service.listPublicPieces("poem", 0, 10);
-        assertThat(poems.getContent()).hasSize(1);
-        assertThat(poems.getContent().get(0).getId()).isEqualTo("p1");
+        PublicPieceDTO piece3 = new PublicPieceDTO();
+        piece3.setId("p3");
+        piece3.setType(TYPE_POEM);
+        storagePort.savePiece(piece3);
+
+        PublicPiecePageDTO firstPage = service.listPublicPieces(TYPE_POEM, 0, 1);
+        assertThat(firstPage.getContent()).hasSize(1);
+        assertThat(firstPage.getTotalPages()).isEqualTo(2);
+        assertThat(firstPage.getTotalElements()).isEqualTo(2);
+
+        PublicPiecePageDTO secondPage = service.listPublicPieces(TYPE_POEM, 1, 1);
+        assertThat(secondPage.getContent()).hasSize(1);
+        assertThat(secondPage.getContent().get(0).getId()).isNotEqualTo(firstPage.getContent().get(0).getId());
     }
 
     @Test
     @DisplayName("Should return reading surface for valid workspace")
     void shouldReturnReadingSurface() {
-        PublicReadingSurfaceDTO surface = service.getReadingSurface("workspace-live");
+        PublicReadingSurfaceDTO surface = service.getReadingSurface(WORKSPACE_LIVE);
 
-        assertThat(surface.getWorkspaceId()).isEqualTo("workspace-live");
-        assertThat(surface.getWorkspaceTitle()).contains("workspace-live");
+        assertThat(surface.getWorkspaceId()).isEqualTo(WORKSPACE_LIVE);
+        assertThat(surface.getWorkspaceTitle()).contains(WORKSPACE_LIVE);
         assertThat(surface.getCompiledItems()).isNotEmpty();
     }
 
