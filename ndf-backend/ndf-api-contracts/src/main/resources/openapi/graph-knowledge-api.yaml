@@ -1,0 +1,110 @@
+openapi: 3.0.3
+info:
+  title: NoteDraftForge Graph Knowledge API
+  description: Graph traceability, node embedding analysis, and anthology network queries.
+  version: 1.0.0
+paths:
+  /api/v1/graph/traceability/{pieceId}:
+    get:
+      summary: Query all workspaces and composite anthologies containing a given piece
+      operationId: getPieceTraceability
+      parameters:
+        - name: pieceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Traceability reference map
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceabilityResponseDTO'
+  /api/v1/graph/workspace/{workspaceId}/subgraph:
+    get:
+      summary: Traverse and return the complete dependency subgraph of a performance flow
+      operationId: getWorkspaceSubgraph
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workspace graph network
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceSubgraphDTO'
+components:
+  schemas:
+    TraceabilityReferenceDTO:
+      type: object
+      required:
+        - workspaceId
+        - workspaceTitle
+        - nodeType
+      properties:
+        workspaceId:
+          type: string
+        workspaceTitle:
+          type: string
+        nodeType:
+          type: string
+          enum: [piece, workspace, branch]
+        parentNodeId:
+          type: string
+    TraceabilityResponseDTO:
+      type: object
+      required:
+        - pieceId
+        - referenceCount
+        - references
+      properties:
+        pieceId:
+          type: string
+        referenceCount:
+          type: integer
+        references:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraceabilityReferenceDTO'
+    WorkspaceSubgraphDTO:
+      type: object
+      required:
+        - rootWorkspaceId
+        - totalNodes
+        - nodes
+        - edges
+      properties:
+        rootWorkspaceId:
+          type: string
+        totalNodes:
+          type: integer
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+              label:
+                type: string
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              target:
+                type: string
+              kind:
+                type: string
+                enum: [primary, branch]
+              conditionLabel:
+                type: string

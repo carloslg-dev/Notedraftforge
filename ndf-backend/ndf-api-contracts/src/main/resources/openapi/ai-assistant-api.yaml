@@ -1,0 +1,115 @@
+openapi: 3.0.3
+info:
+  title: NoteDraftForge AI Writer Assistant API
+  description: LangChain4j-powered poetic meter analysis, rhyme finder, and harmonic suggestions.
+  version: 1.0.0
+paths:
+  /api/v1/ai/meter-analysis:
+    post:
+      summary: Analyze poetic meter, syllable accents, and strophic cadence
+      operationId: analyzePoeticMeter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeterAnalysisRequestDTO'
+      responses:
+        '200':
+          description: Meter and cadence breakdown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterAnalysisResponseDTO'
+  /api/v1/ai/rhyme-suggestions:
+    post:
+      summary: Suggest consonance and assonance rhymes based on poem mood and context
+      operationId: suggestRhymes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RhymeRequestDTO'
+      responses:
+        '200':
+          description: Contextual rhyme candidates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RhymeResponseDTO'
+components:
+  schemas:
+    MeterAnalysisRequestDTO:
+      type: object
+      required:
+        - text
+        - language
+      properties:
+        text:
+          type: string
+          example: "Volverán las oscuras golondrinas"
+        language:
+          type: string
+          default: "es"
+    StanzaMeterDTO:
+      type: object
+      properties:
+        line:
+          type: string
+        syllableCount:
+          type: integer
+        meterType:
+          type: string
+          example: "Endecasílabo (11)"
+        stressPattern:
+          type: string
+          example: "- - / - - / - - - / -"
+    MeterAnalysisResponseDTO:
+      type: object
+      properties:
+        totalLines:
+          type: integer
+        stanzas:
+          type: array
+          items:
+            $ref: '#/components/schemas/StanzaMeterDTO'
+        overallRhythm:
+          type: string
+    RhymeRequestDTO:
+      type: object
+      required:
+        - targetWord
+        - poemContext
+      properties:
+        targetWord:
+          type: string
+          example: "estrella"
+        poemContext:
+          type: string
+          example: "En la noche callada busco tu mirada"
+        rhymeType:
+          type: string
+          enum: [consonant, assonant, rich]
+          default: consonant
+    RhymeCandidateDTO:
+      type: object
+      properties:
+        word:
+          type: string
+        rhymeKind:
+          type: string
+        poeticWeight:
+          type: number
+          format: float
+        usageExample:
+          type: string
+    RhymeResponseDTO:
+      type: object
+      properties:
+        targetWord:
+          type: string
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/RhymeCandidateDTO'

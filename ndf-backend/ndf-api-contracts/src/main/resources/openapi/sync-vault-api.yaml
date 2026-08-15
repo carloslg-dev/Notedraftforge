@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: NoteDraftForge Sync Vault API
-  description: Cloud & Sovereign Git synchronization contracts for user snapshots.
+  description: Cloud (PostgreSQL) & Sovereign Git synchronization contracts for user snapshots.
   version: 1.0.0
 paths:
   /api/v1/vault/sync:
@@ -34,8 +34,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VaultSnapshotDTO'
+  /api/v1/vault/git/sync:
+    post:
+      summary: Commit vault works to user's sovereign GitHub repository as Markdown files with YAML frontmatter
+      operationId: syncToGitHubRepository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitHubSyncRequestDTO'
+      responses:
+        '200':
+          description: Sovereign Git commit created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubSyncResponseDTO'
 components:
   schemas:
+    SyncTargetMode:
+      type: string
+      enum: [cloud_postgres, sovereign_github]
+      default: cloud_postgres
     SyncVaultRequest:
       type: object
       required:
@@ -47,6 +68,8 @@ components:
           type: string
         revision:
           type: integer
+        targetMode:
+          $ref: '#/components/schemas/SyncTargetMode'
         pieces:
           type: array
           items:
@@ -83,6 +106,10 @@ components:
           enum: [text, poem, song]
         language:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
         revision:
           type: integer
     PerformanceFlowDTO:
@@ -97,6 +124,10 @@ components:
           type: string
         description:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
     VaultSnapshotDTO:
       type: object
       properties:
@@ -105,6 +136,40 @@ components:
         userId:
           type: string
         revision:
+          type: integer
+        syncedAt:
+          type: string
+          format: date-time
+    GitHubSyncRequestDTO:
+      type: object
+      required:
+        - repoOwner
+        - repoName
+        - branch
+        - personalAccessToken
+      properties:
+        repoOwner:
+          type: string
+          example: "poet-user"
+        repoName:
+          type: string
+          example: "my-poetic-vault"
+        branch:
+          type: string
+          default: "main"
+        personalAccessToken:
+          type: string
+        commitMessage:
+          type: string
+          default: "chore(sync): update sovereign vault from NoteDraftForge"
+    GitHubSyncResponseDTO:
+      type: object
+      properties:
+        commitSha:
+          type: string
+        commitUrl:
+          type: string
+        filesCommitted:
           type: integer
         syncedAt:
           type: string
