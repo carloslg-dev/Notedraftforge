@@ -62,18 +62,14 @@ export function WorkspacePage() {
   const pieceMap = useMemo(() => new Map(pieces.map((p) => [p.id, p])), [pieces]);
   const workspaceMap = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces]);
 
-  const handleAddPiece = useCallback((piece: Piece) => {
-    const newNode: FlowNode = {
-      id: randomUUID(),
-      type: 'piece',
-      pieceId: piece.id
-    };
+  const addNodeToFlow = useCallback((newNode: FlowNode) => {
     setNodes((prev) => {
       const updated = [...prev, newNode];
-      if (prev.length > 0) {
+      const prevNode = prev.at(-1);
+      if (prevNode) {
         const newEdge: FlowEdge = {
           id: randomUUID(),
-          sourceNodeId: prev[prev.length - 1].id,
+          sourceNodeId: prevNode.id,
           targetNodeId: newNode.id,
           isPrimary: true
         };
@@ -83,50 +79,32 @@ export function WorkspacePage() {
     });
   }, []);
 
+  const handleAddPiece = useCallback((piece: Piece) => {
+    addNodeToFlow({
+      id: randomUUID(),
+      type: 'piece',
+      pieceId: piece.id
+    });
+  }, [addNodeToFlow]);
+
   const handleAddWorkspace = useCallback((ws: PerformanceFlow) => {
-    const newNode: FlowNode = {
+    addNodeToFlow({
       id: randomUUID(),
       type: 'workspace',
       workspaceId: ws.id
-    };
-    setNodes((prev) => {
-      const updated = [...prev, newNode];
-      if (prev.length > 0) {
-        const newEdge: FlowEdge = {
-          id: randomUUID(),
-          sourceNodeId: prev[prev.length - 1].id,
-          targetNodeId: newNode.id,
-          isPrimary: true
-        };
-        setEdges((edgePrev) => [...edgePrev, newEdge]);
-      }
-      return updated;
     });
-  }, []);
+  }, [addNodeToFlow]);
 
   const handleAddBranch = useCallback(() => {
     const question = window.prompt(t('branchLabel'), '¿Repetir estribillo?');
     if (!question?.trim()) return;
 
-    const newNode: FlowNode = {
+    addNodeToFlow({
       id: randomUUID(),
       type: 'branch',
       label: question.trim()
-    };
-    setNodes((prev) => {
-      const updated = [...prev, newNode];
-      if (prev.length > 0) {
-        const newEdge: FlowEdge = {
-          id: randomUUID(),
-          sourceNodeId: prev[prev.length - 1].id,
-          targetNodeId: newNode.id,
-          isPrimary: true
-        };
-        setEdges((edgePrev) => [...edgePrev, newEdge]);
-      }
-      return updated;
     });
-  }, [t]);
+  }, [t, addNodeToFlow]);
 
   const handleRemoveNode = useCallback((nodeId: string) => {
     setNodes((prev) => prev.filter((n) => n.id !== nodeId));
@@ -149,9 +127,10 @@ export function WorkspacePage() {
     if (!currentFlow || isSaving) return;
     try {
       setIsSaving(true);
+      const trimmedTitle = title.trim();
       await updateWorkspace({
         id: currentFlow.id,
-        title: title.trim() || currentFlow.title,
+        title: trimmedTitle.length > 0 ? trimmedTitle : currentFlow.title,
         nodes,
         edges
       });

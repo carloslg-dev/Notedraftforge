@@ -5,7 +5,16 @@ import { useTranslation } from '@/ui/hooks/use-translation';
 import { useWorkspaces } from './use-workspaces';
 import { useWorkList } from '@/ui/features/work-list/use-work-list';
 import { compileFlowToReadingSurface } from '@/core/domain/factories/performance-flow';
-import type { PerformanceFlow, CompiledReadingItem, PieceContent, TextBlock, TextRun, FlowNode, FlowEdge } from '@/core/domain/types';
+import type {
+  PerformanceFlow,
+  CompiledReadingItem,
+  PieceContent,
+  TextBlock,
+  TextRun,
+  FlowNode,
+  FlowEdge,
+  BranchNode
+} from '@/core/domain/types';
 import { Button } from '@/ui/components/ui/button';
 
 function RenderReadingBlock({ block }: { readonly block: TextBlock }) {
@@ -57,6 +66,49 @@ function RenderPieceReadingContent({ content }: { readonly content: PieceContent
   );
 }
 
+function DecisionBarItem({
+  node,
+  edges,
+  selectedDecision,
+  onSelectDecision
+}: {
+  readonly node: BranchNode;
+  readonly edges: readonly FlowEdge[];
+  readonly selectedDecision?: string;
+  readonly onSelectDecision: (nodeId: string, edgeId: string) => void;
+}) {
+  const outgoing = edges.filter((e) => e.sourceNodeId === node.id);
+
+  return (
+    <div className="flex items-center gap-2 bg-background p-2 rounded-lg border border-amber-200 dark:border-amber-800 text-xs shadow-xs">
+      <span className="font-medium text-foreground">
+        {node.label}:
+      </span>
+      <div className="flex gap-1">
+        {outgoing.map((edge: FlowEdge, idx: number) => {
+          const isChosen =
+            selectedDecision === edge.id ||
+            (!selectedDecision && (edge.isPrimary || idx === 0));
+          return (
+            <button
+              key={edge.id}
+              type="button"
+              onClick={() => onSelectDecision(node.id, edge.id)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                isChosen
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {edge.label ?? `Opción ${idx + 1}`}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function AuditionPage() {
   const { flowId } = useParams<{ flowId: string }>();
   const navigate = useNavigate();
@@ -96,7 +148,7 @@ export function AuditionPage() {
 
   const branchNodes = useMemo(() => {
     if (!currentFlow) return [];
-    return currentFlow.nodes.filter((n: FlowNode) => n.type === 'branch');
+    return currentFlow.nodes.filter((n: FlowNode): n is BranchNode => n.type === 'branch');
   }, [currentFlow]);
 
   const handleSelectDecision = useCallback((branchNodeId: string, edgeIdOrTarget: string) => {
@@ -150,40 +202,15 @@ export function AuditionPage() {
               <span>{t('decisionPoint')}s en Vivo:</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {branchNodes.map((node: FlowNode) => {
-                const outgoing = currentFlow.edges.filter((e: FlowEdge) => e.sourceNodeId === node.id);
-                return (
-                  <div
-                    key={node.id}
-                    className="flex items-center gap-2 bg-background p-2 rounded-lg border border-amber-200 dark:border-amber-800 text-xs shadow-xs"
-                  >
-                    <span className="font-medium text-foreground">
-                      {(node as any).label}:
-                    </span>
-                    <div className="flex gap-1">
-                      {outgoing.map((edge: FlowEdge, idx: number) => {
-                        const isChosen =
-                          selectedDecisions[node.id] === edge.id ||
-                          (!selectedDecisions[node.id] && (edge.isPrimary || idx === 0));
-                        return (
-                          <button
-                            key={edge.id}
-                            type="button"
-                            onClick={() => handleSelectDecision(node.id, edge.id)}
-                            className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                              isChosen
-                                ? 'bg-primary text-primary-foreground shadow-xs'
-                                : 'bg-muted text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            {edge.label || `Opción ${idx + 1}`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+              {branchNodes.map((node: BranchNode) => (
+                <DecisionBarItem
+                  key={node.id}
+                  node={node}
+                  edges={currentFlow.edges}
+                  selectedDecision={selectedDecisions[node.id]}
+                  onSelectDecision={handleSelectDecision}
+                />
+              ))}
             </div>
           </div>
         </div>

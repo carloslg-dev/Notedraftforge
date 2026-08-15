@@ -39,9 +39,10 @@ export function CreateWorkspaceModal({
         .map((t) => t.trim())
         .filter(Boolean);
 
+      const trimmedDesc = description.trim();
       const flow = await useCase.execute({
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: trimmedDesc.length > 0 ? trimmedDesc : undefined,
         tags
       });
 

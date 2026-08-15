@@ -53,9 +53,11 @@ function parseField(key: string, valStr: string, metadata: FrontmatterMetadata):
     case 'language':
       metadata.language = value;
       break;
-    case 'revision':
-      metadata.revision = Number.parseInt(value, 10) || 0;
+    case 'revision': {
+      const parsedRev = Number.parseInt(value, 10);
+      metadata.revision = Number.isNaN(parsedRev) ? 0 : parsedRev;
       break;
+    }
     case 'createdAt':
       metadata.createdAt = value;
       break;
@@ -131,12 +133,12 @@ export function parseYamlMarkdownToPiece(rawContent: string, fallbackTitle = 'Un
   const parser = new MarkedParserAdapter();
   const blocks = parser.parse(body);
 
-  const pieceType = metadata.type || 'poem';
-  const title = metadata.title || fallbackTitle;
+  const pieceType = metadata.type ?? 'poem';
+  const title = metadata.title ?? fallbackTitle;
   const piece = createPiece({
     title,
     type: pieceType,
-    language: metadata.language || 'es'
+    language: metadata.language ?? 'es'
   });
 
   applyMetadataToPiece(piece, metadata, pieceType);

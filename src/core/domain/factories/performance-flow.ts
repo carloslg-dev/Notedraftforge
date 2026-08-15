@@ -1,5 +1,3 @@
-import { randomUUID } from '../uuid';
-import type { Piece } from '../types/piece';
 import type {
   PerformanceFlow,
   FlowNode,
@@ -7,8 +5,11 @@ import type {
   PieceNode,
   WorkspaceNode,
   PieceTraceabilityReference,
-  CompiledReadingItem
-} from '../types/performance-flow';
+  CompiledReadingItem,
+  Piece,
+  PieceContent
+} from '../types';
+import { randomUUID } from '../uuid';
 
 export interface CreatePerformanceFlowParams {
   readonly id?: string;
@@ -60,11 +61,12 @@ export function createPerformanceFlow(params: CreatePerformanceFlowParams): Perf
   validateEdgeConnections(edges, nodes);
 
   const now = new Date().toISOString();
+  const desc = params.description?.trim();
 
   return {
     id: params.id ?? randomUUID(),
     title,
-    description: params.description?.trim() || undefined,
+    description: desc && desc.length > 0 ? desc : undefined,
     tags: (params.tags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean),
     nodes,
     edges,
@@ -170,7 +172,7 @@ function getNextNodeId(
   }
 
   const primaryEdge = outgoing.find((e) => e.isPrimary);
-  return primaryEdge ? primaryEdge.targetNodeId : outgoing[0].targetNodeId;
+  return primaryEdge?.targetNodeId ?? outgoing[0].targetNodeId;
 }
 
 export interface CompileFlowOptions {
@@ -182,31 +184,77 @@ export interface CompileFlowOptions {
   readonly visitedWorkspaces?: ReadonlySet<string>;
 }
 
+function resolvePieceContent(content: PieceContent, blockId?: string): PieceContent {
+  if (!blockId || content.kind !== 'text') {
+    return content;
+  }
+  const matchedBlock = content.blocks.find((b) => b.id === blockId);
+  return {
+    kind: 'text',
+    blocks: matchedBlock ? [matchedBlock] : content.blocks
+  };
+}
+
 function createCompiledPieceItem(
   node: PieceNode,
   piece: Piece,
   breadcrumb: readonly string[]
 ): CompiledReadingItem {
-  let content = piece.content;
-  if (node.blockId && content.kind === 'text') {
-    const matchedBlock = content.blocks.find((b) => b.id === node.blockId);
-    content = {
-      kind: 'text',
-      blocks: matchedBlock ? [matchedBlock] : content.blocks
-    };
-  }
   return {
     nodeId: node.id,
     pieceId: piece.id,
     pieceTitle: piece.title,
     blockId: node.blockId,
-    content,
+    content: resolvePieceContent(piece.content, node.blockId),
     workspaceBreadcrumb: breadcrumb
   };
 }
 
+function compilePieceNode(
+  node: PieceNode,
+  getPieceById: (id: string) => Piece | undefined,
+  breadcrumb: readonly string[]
+): CompiledReadingItem[] {
+  const piece = getPieceById(node.pieceId);
+  if (!piece) return [];
+  return [createCompiledPieceItem(node, piece, breadcrumb)];
+}
+
+function compileWorkspaceNode(
+  node: WorkspaceNode,
+  options: CompileFlowOptions,
+  updatedVisited: Set<string>,
+  breadcrumb: readonly string[]
+): CompiledReadingItem[] {
+  const nested = options.getWorkspaceById(node.workspaceId);
+  if (!nested) return [];
+  return compileFlowToReadingSurface({
+    flow: nested,
+    getPieceById: options.getPieceById,
+    getWorkspaceById: options.getWorkspaceById,
+    selectedDecisions: options.selectedDecisions,
+    breadcrumb,
+    visitedWorkspaces: updatedVisited
+  });
+}
+
+function compileSingleNode(
+  node: FlowNode,
+  options: CompileFlowOptions,
+  updatedVisited: Set<string>,
+  breadcrumb: readonly string[]
+): CompiledReadingItem[] {
+  if (node.type === 'piece') {
+    return compilePieceNode(node as PieceNode, options.getPieceById, breadcrumb);
+  }
+  if (node.type === 'workspace') {
+    return compileWorkspaceNode(node as WorkspaceNode, options, updatedVisited, breadcrumb);
+  }
+  return [];
+}
+
 export function compileFlowToReadingSurface(options: CompileFlowOptions): CompiledReadingItem[] {
-  const { flow, getPieceById, getWorkspaceById, selectedDecisions, breadcrumb = [], visitedWorkspaces = new Set() } = options;
+  const { flow, selectedDecisions, breadcrumb = [], visitedWorkspaces = new Set() } = options;
 
   if (visitedWorkspaces.has(flow.id)) {
     throw new Error(`Circular workspace reference detected during compilation: ${flow.id}`);
@@ -223,45 +271,23 @@ export function compileFlowToReadingSurface(options: CompileFlowOptions): Compil
   const items: CompiledReadingItem[] = [];
   const visitedNodeIds = new Set<string>();
 
-  function traverseNode(nodeId: string | null): void {
+  const traverseNode = (nodeId: string | null): void => {
     if (!nodeId || visitedNodeIds.has(nodeId)) return;
     visitedNodeIds.add(nodeId);
 
     const node = nodeMap.get(nodeId);
     if (!node) return;
 
-    if (node.type === 'piece') {
-      const pieceNode = node as PieceNode;
-      const piece = getPieceById(pieceNode.pieceId);
-      if (piece) {
-        items.push(createCompiledPieceItem(pieceNode, piece, currentBreadcrumb));
-      }
-    } else if (node.type === 'workspace') {
-      const workspaceNode = node as WorkspaceNode;
-      const nestedWorkspace = getWorkspaceById(workspaceNode.workspaceId);
-      if (nestedWorkspace) {
-        const nestedItems = compileFlowToReadingSurface({
-          flow: nestedWorkspace,
-          getPieceById,
-          getWorkspaceById,
-          selectedDecisions,
-          breadcrumb: currentBreadcrumb,
-          visitedWorkspaces: updatedVisited
-        });
-        items.push(...nestedItems);
-      }
-    }
+    const nodeItems = compileSingleNode(node, options, updatedVisited, currentBreadcrumb);
+    items.push(...nodeItems);
 
     const nextId = getNextNodeId(node, flow.edges, selectedDecisions);
     traverseNode(nextId);
-  }
+  };
 
-  if (startNodes.length > 0) {
-    for (const startNode of startNodes) {
-      traverseNode(startNode.id);
-    }
-  } else if (flow.nodes.length > 0) {
-    traverseNode(flow.nodes[0].id);
+  const initialNodes = startNodes.length > 0 ? startNodes : flow.nodes.slice(0, 1);
+  for (const startNode of initialNodes) {
+    traverseNode(startNode.id);
   }
 
   return items;
