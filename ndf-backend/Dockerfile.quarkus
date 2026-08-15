@@ -1,0 +1,31 @@
+# Multi-stage Dockerfile for NoteDraftForge Quarkus microservices
+ARG SERVICE_MODULE=ndf-gateway-auth
+
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
+ARG SERVICE_MODULE
+WORKDIR /workspace
+
+# Copy parent pom and all modules
+COPY pom.xml ./
+COPY ndf-core-domain ./ndf-core-domain
+COPY ndf-api-contracts ./ndf-api-contracts
+COPY ndf-gateway-auth ./ndf-gateway-auth
+COPY ndf-service-sync-vault ./ndf-service-sync-vault
+COPY ndf-service-showcase ./ndf-service-showcase
+COPY ndf-service-graph-knowledge ./ndf-service-graph-knowledge
+COPY ndf-service-ai-gateway ./ndf-service-ai-gateway
+
+# Build fast-jar for the targeted service
+RUN mvn clean package -DskipTests -pl :${SERVICE_MODULE} -am
+
+FROM eclipse-temurin:21-jre-alpine
+ARG SERVICE_MODULE
+WORKDIR /app
+
+COPY --from=builder /workspace/${SERVICE_MODULE}/target/quarkus-app/lib/ /app/lib/
+COPY --from=builder /workspace/${SERVICE_MODULE}/target/quarkus-app/*.jar /app/
+COPY --from=builder /workspace/${SERVICE_MODULE}/target/quarkus-app/app/ /app/app/
+COPY --from=builder /workspace/${SERVICE_MODULE}/target/quarkus-app/quarkus/ /app/quarkus/
+
+ENV JAVA_OPTS="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/quarkus-run.jar"]

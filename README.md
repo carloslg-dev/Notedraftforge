@@ -96,6 +96,16 @@ cd ndf-backend
 mvn clean test     # Builds and runs all JUnit 5 domain invariant tests across all modules
 ```
 
+### 🐳 Running with Docker Compose
+
+```bash
+# Option A: Start the full local stack (Datastores, 5 Quarkus microservices, React UI)
+docker compose up --build
+
+# Option B: Start only infrastructure datastores (PostgreSQL 5432 & Neo4j 7474/7687) for local Quarkus dev mode
+docker compose -f docker-compose.infra.yml up -d
+```
+
 ---
 
 ## 👤 Author

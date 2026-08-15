@@ -1,0 +1,128 @@
+services:
+  # -------------------------------------------------------------
+  # Infrastructure Datastores
+  # -------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ndf-postgres
+    environment:
+      POSTGRES_DB: notedraftforge_vault
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notedraftforge_vault"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: ndf-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/notedraftforge
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------
+  # Gateway & Security Service
+  # -------------------------------------------------------------
+  gateway-auth:
+    build:
+      context: ./ndf-backend
+      dockerfile: Dockerfile.quarkus
+      args:
+        SERVICE_MODULE: ndf-gateway-auth
+    container_name: ndf-gateway-auth
+    ports:
+      - "8080:8080"
+    environment:
+      QUARKUS_HTTP_PORT: 8080
+
+  # -------------------------------------------------------------
+  # Satellite Microservices
+  # -------------------------------------------------------------
+  service-sync-vault:
+    build:
+      context: ./ndf-backend
+      dockerfile: Dockerfile.quarkus
+      args:
+        SERVICE_MODULE: ndf-service-sync-vault
+    container_name: ndf-service-sync-vault
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      QUARKUS_HTTP_PORT: 8081
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/notedraftforge_vault
+
+  service-showcase:
+    build:
+      context: ./ndf-backend
+      dockerfile: Dockerfile.quarkus
+      args:
+        SERVICE_MODULE: ndf-service-showcase
+    container_name: ndf-service-showcase
+    ports:
+      - "8082:8082"
+    environment:
+      QUARKUS_HTTP_PORT: 8082
+
+  service-graph-knowledge:
+    build:
+      context: ./ndf-backend
+      dockerfile: Dockerfile.quarkus
+      args:
+        SERVICE_MODULE: ndf-service-graph-knowledge
+    container_name: ndf-service-graph-knowledge
+    ports:
+      - "8083:8083"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      QUARKUS_HTTP_PORT: 8083
+      QUARKUS_NEO4J_URI: bolt://neo4j:7687
+
+  service-ai-gateway:
+    build:
+      context: ./ndf-backend
+      dockerfile: Dockerfile.quarkus
+      args:
+        SERVICE_MODULE: ndf-service-ai-gateway
+    container_name: ndf-service-ai-gateway
+    ports:
+      - "8084:8084"
+    environment:
+      QUARKUS_HTTP_PORT: 8084
+
+  # -------------------------------------------------------------
+  # Frontend SPA (ndf-react)
+  # -------------------------------------------------------------
+  react-frontend:
+    build:
+      context: ./ndf-react
+      dockerfile: Dockerfile
+    container_name: ndf-react-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway-auth
+
+volumes:
+  postgres_data:
+  neo4j_data:
