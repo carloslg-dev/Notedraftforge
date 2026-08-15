@@ -13,12 +13,153 @@
 
     <artifactId>ndf-api-contracts</artifactId>
     <name>NoteDraftForge :: API Contracts</name>
-    <description>API-First OpenAPI 3.0 Specifications and Data Transfer Objects</description>
+    <description>API-First OpenAPI 3.0 Specifications and Generated Java Contracts / DTOs</description>
 
     <dependencies>
         <dependency>
             <groupId>org.notedraftforge</groupId>
             <artifactId>ndf-core-domain</artifactId>
         </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>7.11.0</version>
+                <executions>
+                    <!-- 1. Sync Vault API Contracts -->
+                    <execution>
+                        <id>generate-sync-vault-contracts</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/sync-vault-api.yaml</inputSpec>
+                            <generatorName>jaxrs-spec</generatorName>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useJakartaEe>true</useJakartaEe>
+                                <useSwaggerAnnotations>false</useSwaggerAnnotations>
+                                <dateLibrary>java8</dateLibrary>
+                                <openApiNullable>false</openApiNullable>
+                                <returnResponse>true</returnResponse>
+                                <apiPackage>org.ndf.contracts.vault.api</apiPackage>
+                                <modelPackage>org.ndf.contracts.vault.model</modelPackage>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+
+                    <!-- 2. Public Showcase API Contracts -->
+                    <execution>
+                        <id>generate-showcase-contracts</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/showcase-api.yaml</inputSpec>
+                            <generatorName>jaxrs-spec</generatorName>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useJakartaEe>true</useJakartaEe>
+                                <useSwaggerAnnotations>false</useSwaggerAnnotations>
+                                <dateLibrary>java8</dateLibrary>
+                                <openApiNullable>false</openApiNullable>
+                                <returnResponse>true</returnResponse>
+                                <apiPackage>org.ndf.contracts.showcase.api</apiPackage>
+                                <modelPackage>org.ndf.contracts.showcase.model</modelPackage>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+
+                    <!-- 3. Graph Knowledge API Contracts -->
+                    <execution>
+                        <id>generate-graph-knowledge-contracts</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/graph-knowledge-api.yaml</inputSpec>
+                            <generatorName>jaxrs-spec</generatorName>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useJakartaEe>true</useJakartaEe>
+                                <useSwaggerAnnotations>false</useSwaggerAnnotations>
+                                <dateLibrary>java8</dateLibrary>
+                                <openApiNullable>false</openApiNullable>
+                                <returnResponse>true</returnResponse>
+                                <apiPackage>org.ndf.contracts.graph.api</apiPackage>
+                                <modelPackage>org.ndf.contracts.graph.model</modelPackage>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+
+                    <!-- 4. AI Assistant API Contracts -->
+                    <execution>
+                        <id>generate-ai-assistant-contracts</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/ai-assistant-api.yaml</inputSpec>
+                            <generatorName>jaxrs-spec</generatorName>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useJakartaEe>true</useJakartaEe>
+                                <useSwaggerAnnotations>false</useSwaggerAnnotations>
+                                <dateLibrary>java8</dateLibrary>
+                                <openApiNullable>false</openApiNullable>
+                                <returnResponse>true</returnResponse>
+                                <apiPackage>org.ndf.contracts.ai.api</apiPackage>
+                                <modelPackage>org.ndf.contracts.ai.model</modelPackage>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Add Generated Sources to Compilation Path -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>add-generated-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/openapi/src/gen/java</source>
+                                <source>${project.build.directory}/generated-sources/openapi/src/main/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

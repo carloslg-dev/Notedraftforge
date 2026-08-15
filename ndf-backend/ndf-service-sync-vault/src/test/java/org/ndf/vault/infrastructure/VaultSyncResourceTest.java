@@ -4,9 +4,10 @@ import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.ndf.contracts.vault.model.GitHubSyncRequestDTO;
+import org.ndf.contracts.vault.model.SyncVaultRequest;
+import org.ndf.contracts.vault.model.SyncVaultResponse;
 import org.ndf.domain.model.common.AuditMetadata;
-import org.ndf.domain.model.piece.Piece;
-import org.ndf.domain.model.piece.PieceType;
 import org.ndf.domain.model.vault.VaultContent;
 import org.ndf.domain.model.vault.VaultSnapshot;
 import org.ndf.vault.application.exceptions.RevisionConflictException;
@@ -15,9 +16,6 @@ import org.ndf.vault.application.ports.in.SyncToGitHubUseCase;
 import org.ndf.vault.application.ports.in.SyncToGitHubUseCase.GitHubSyncResult;
 import org.ndf.vault.application.ports.in.SyncVaultUseCase;
 import org.ndf.vault.infrastructure.adapters.in.rest.VaultSyncResource;
-import org.ndf.vault.infrastructure.adapters.in.rest.dto.GitHubSyncRequestDTO;
-import org.ndf.vault.infrastructure.adapters.in.rest.dto.SyncRequestDTO;
-import org.ndf.vault.infrastructure.adapters.in.rest.dto.SyncResponseDTO;
 
 import java.util.List;
 import java.util.Optional;
@@ -40,18 +38,18 @@ class VaultSyncResourceTest {
     }
 
     @Test
-    @DisplayName("Should return 200 OK with SyncResponseDTO when sync succeeds")
+    @DisplayName("Should return 200 OK with SyncVaultResponse when sync succeeds")
     void shouldReturnOkOnSyncSuccess() {
         syncVaultUseCase.resultToReturn = new SyncVaultUseCase.SyncResult("SYNCHRONIZED", 5, "2026-08-15T12:00:00Z");
 
-        SyncRequestDTO request = new SyncRequestDTO("user-1", 4, "cloud_postgres", List.of(), List.of(), List.of());
+        SyncVaultRequest request = new SyncVaultRequest("user-1", 4, List.of());
         Response response = resource.syncVault(request);
 
         assertThat(response.getStatus()).isEqualTo(Response.Status.OK.getStatusCode());
-        assertThat(response.getEntity()).isInstanceOf(SyncResponseDTO.class);
-        SyncResponseDTO dto = (SyncResponseDTO) response.getEntity();
-        assertThat(dto.status()).isEqualTo("SYNCHRONIZED");
-        assertThat(dto.revision()).isEqualTo(5);
+        assertThat(response.getEntity()).isInstanceOf(SyncVaultResponse.class);
+        SyncVaultResponse dto = (SyncVaultResponse) response.getEntity();
+        assertThat(dto.getStatus()).isEqualTo("SYNCHRONIZED");
+        assertThat(dto.getRevision()).isEqualTo(5);
     }
 
     @Test
@@ -59,7 +57,7 @@ class VaultSyncResourceTest {
     void shouldReturnConflictOnOutdatedRevision() {
         syncVaultUseCase.exceptionToThrow = new RevisionConflictException("Stale revision", 10, 4);
 
-        SyncRequestDTO request = new SyncRequestDTO("user-1", 4, "cloud_postgres", List.of(), List.of(), List.of());
+        SyncVaultRequest request = new SyncVaultRequest("user-1", 4, List.of());
         Response response = resource.syncVault(request);
 
         assertThat(response.getStatus()).isEqualTo(Response.Status.CONFLICT.getStatusCode());
@@ -92,8 +90,7 @@ class VaultSyncResourceTest {
     void shouldReturnOkOnGitHubSyncSuccess() {
         syncToGitHubUseCase.resultToReturn = new GitHubSyncResult("sha-xyz", "https://github.com/u/repo/commit/sha-xyz", 1, "2026-08-15T12:00:00Z");
 
-        Piece piece = Piece.createNew("p1", "Soneto", PieceType.POEM, "es");
-        GitHubSyncRequestDTO request = new GitHubSyncRequestDTO("u1", "owner", "repo", "main", "token", "initial commit", List.of(piece));
+        GitHubSyncRequestDTO request = new GitHubSyncRequestDTO("owner", "repo", "main", "token");
         Response response = resource.syncToGitHub(request);
 
         assertThat(response.getStatus()).isEqualTo(Response.Status.OK.getStatusCode());
