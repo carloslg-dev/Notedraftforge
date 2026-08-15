@@ -7,5 +7,9 @@ dist/
 .scannerwork/
 coverage/
 *.tmp
+target/
+**/target/
+.quarkus/
+**/.quarkus/
 sonar_issues.json
 all_issues_formatted.txt

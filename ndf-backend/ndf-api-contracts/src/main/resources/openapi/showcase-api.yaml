@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: NoteDraftForge Public Showcase API
+  description: Public sanitized feed and recital graph reader contracts.
+  version: 1.0.0
+paths:
+  /api/v1/showcase/pieces:
+    get:
+      summary: List public sanitized creative pieces
+      operationId: listPublicPieces
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [text, poem, song]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Paginated public works
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicPiecePageDTO'
+  /api/v1/showcase/workspaces/{id}/reading-surface:
+    get:
+      summary: Get compiled continuous reading surface for a public performance flow
+      operationId: getPublicReadingSurface
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Continuous recital reading surface
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicReadingSurfaceDTO'
+components:
+  schemas:
+    PublicPieceDTO:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        language:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        publishedAt:
+          type: string
+          format: date-time
+    PublicPiecePageDTO:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicPieceDTO'
+        page:
+          type: integer
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+    PublicReadingSurfaceDTO:
+      type: object
+      properties:
+        workspaceId:
+          type: string
+        workspaceTitle:
+          type: string
+        compiledItems:
+          type: array
+          items:
+            type: object
+            properties:
+              pieceId:
+                type: string
+              pieceTitle:
+                type: string
+              content:
+                type: string

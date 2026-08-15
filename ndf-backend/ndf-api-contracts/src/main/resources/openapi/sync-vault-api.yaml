@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: NoteDraftForge Sync Vault API
+  description: Cloud & Sovereign Git synchronization contracts for user snapshots.
+  version: 1.0.0
+paths:
+  /api/v1/vault/sync:
+    post:
+      summary: Synchronize client vault snapshot
+      operationId: syncVaultSnapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncVaultRequest'
+      responses:
+        '200':
+          description: Snapshot successfully synchronized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncVaultResponse'
+        '409':
+          description: Revision conflict detected
+  /api/v1/vault/latest:
+    get:
+      summary: Get the latest vault snapshot for the authenticated user
+      operationId: getLatestVaultSnapshot
+      responses:
+        '200':
+          description: Latest vault snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultSnapshotDTO'
+components:
+  schemas:
+    SyncVaultRequest:
+      type: object
+      required:
+        - userId
+        - revision
+        - pieces
+      properties:
+        userId:
+          type: string
+        revision:
+          type: integer
+        pieces:
+          type: array
+          items:
+            $ref: '#/components/schemas/PieceDTO'
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/PerformanceFlowDTO'
+    SyncVaultResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: SYNCHRONIZED
+        revision:
+          type: integer
+          example: 42
+        syncedAt:
+          type: string
+          format: date-time
+    PieceDTO:
+      type: object
+      required:
+        - id
+        - title
+        - type
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum: [text, poem, song]
+        language:
+          type: string
+        revision:
+          type: integer
+    PerformanceFlowDTO:
+      type: object
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+    VaultSnapshotDTO:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        revision:
+          type: integer
+        syncedAt:
+          type: string
+          format: date-time

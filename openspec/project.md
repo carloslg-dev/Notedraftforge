@@ -78,6 +78,7 @@ Implementation order and issue breakdown: `openspec/backlog.md`.
 | Layer visibility (toggle, rendering) | `openspec/specs/layer-visibility/spec.md` |
 | Snapshot and layer state (pre-render, CSS toggle, persistence) | `openspec/specs/snapshot-and-layer-state/spec.md` |
 | Performance flows & workspaces (canvas, graph traceability, composite nodes) | `openspec/specs/performance-flow/spec.md` |
+| Quarkus satellite backends (Cloud Sync Vault, Public Showcase, AI Gateway) | `openspec/specs/quarkus-satellite-backends/spec.md` |
 
 ## Non-Functional Requirements
 
