@@ -86,8 +86,11 @@ describe('PerformanceFlow Domain Entity & Operations', () => {
       ]
     });
 
-    expect(bookWorkspace.nodes[0].type).toBe('workspace');
-    expect((bookWorkspace.nodes[0] as any).workspaceId).toBe('ws-poem');
+    const firstNode = bookWorkspace.nodes[0];
+    expect(firstNode.type).toBe('workspace');
+    if (firstNode.type === 'workspace') {
+      expect(firstNode.workspaceId).toBe('ws-poem');
+    }
   });
 
   it('detects and rejects circular workspace embedding (PF-REQ-02, PF-SCN-04)', () => {

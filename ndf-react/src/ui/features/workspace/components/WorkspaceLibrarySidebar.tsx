@@ -22,7 +22,7 @@ function PiecesTabContent({
   readonly pieces: readonly Piece[];
   readonly traceabilityMap: Readonly<Record<string, number>>;
   readonly onAddPiece: (p: Piece) => void;
-  readonly t: (key: any) => string;
+  readonly t: (key: Parameters<ReturnType<typeof useTranslation>['t']>[0]) => string;
 }) {
   if (pieces.length === 0) {
     return (
@@ -78,7 +78,7 @@ function WorkspacesTabContent({
 }: {
   readonly workspaces: readonly PerformanceFlow[];
   readonly onAddWorkspace: (w: PerformanceFlow) => void;
-  readonly t: (key: any) => string;
+  readonly t: (key: Parameters<ReturnType<typeof useTranslation>['t']>[0]) => string;
 }) {
   if (workspaces.length === 0) {
     return (

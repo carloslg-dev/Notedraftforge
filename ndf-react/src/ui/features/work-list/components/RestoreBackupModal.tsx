@@ -64,7 +64,7 @@ interface DropzoneProps {
   uploadedFile: File | null;
   fileInputRef: React.RefObject<HTMLInputElement>;
   uiLanguage: string;
-  t: (key: any) => string;
+  t: (key: Parameters<ReturnType<typeof useTranslation>['t']>[0]) => string;
   handleDrag: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent) => void;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;

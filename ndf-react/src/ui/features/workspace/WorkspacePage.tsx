@@ -11,7 +11,7 @@ import type { FlowNode, FlowEdge, Piece, PerformanceFlow } from '@/core/domain/t
 import { randomUUID } from '@/core/domain/uuid';
 import { Button } from '@/ui/components/ui/button';
 
-function getSaveLabel(isSaving: boolean, saveSuccess: boolean, t: (key: any) => string): string {
+function getSaveLabel(isSaving: boolean, saveSuccess: boolean, t: (key: Parameters<ReturnType<typeof useTranslation>['t']>[0]) => string): string {
   if (isSaving) return t('saving');
   if (saveSuccess) return t('flowSaved');
   return t('save');
